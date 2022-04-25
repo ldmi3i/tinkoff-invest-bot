@@ -19,11 +19,16 @@ func initDB() {
 		log.Fatalf("Error while connecting to db: \n%s", err)
 	}
 	db = dbConn
+	err = migrate()
+	if err != nil {
+		log.Fatalf("Error while performing migrations:\n%s", err)
+	}
 }
 
-func Migrate() error {
+func migrate() error {
 	return db.AutoMigrate(
-		domain.History{},
+		&domain.History{},
+		&domain.Trace{},
 	)
 }
 
