@@ -22,7 +22,7 @@ func NewHistoryHandler(h robot.HistoryAPI) HistoryHandler {
 }
 
 func (h DefaultHistoryHandler) LoadHistory(c *gin.Context) {
-	var req dto.LoadHistoryRequest
+	req := dto.LoadHistoryRequest{Interval: 5}
 	err := c.ShouldBindJSON(&req)
 	if err != nil {
 		log.Printf("Error while validating request:\n%s", err)
@@ -30,7 +30,7 @@ func (h DefaultHistoryHandler) LoadHistory(c *gin.Context) {
 		return
 	}
 	log.Printf("Load history: %+v", req)
-	err = h.api.LoadHistory(req.Figis, time.Unix(req.StartTime, 0), time.Unix(req.EndTime, 0))
+	err = h.api.LoadHistory(req.Figis, req.Interval, time.Unix(req.StartTime, 0), time.Unix(req.EndTime, 0))
 	if err != nil {
 		log.Printf("Error while loading history:\n%s", err)
 		c.JSON(http.StatusInternalServerError, err.Error())
