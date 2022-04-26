@@ -2,8 +2,7 @@ package app
 
 import (
 	"invest-robot/helper"
-	"invest-robot/service"
-	"invest-robot/tinapi"
+	"invest-robot/http"
 	"log"
 )
 
@@ -15,12 +14,14 @@ func Start() {
 		}
 	}()
 
-	api := tinapi.NewTinApi()
-	infoSrv := service.NewInfoSrv(api)
-	book, err := infoSrv.GetOrderBook()
-	if err != nil {
-		log.Printf("Error getting orders:\n%s", err)
-		return
-	}
-	log.Printf("Successfully retrieved book: %s", book)
+	//api := tinapi.NewTinApi()
+	//infoSrv := service.NewInfoService(api)
+	//book, err := infoSrv.GetOrderBook()
+	//if err != nil {
+	//	log.Printf("Error getting orders:\n%s", err)
+	//	return
+	//}
+	//log.Printf("Successfully retrieved book: %s", book)
+
+	http.StartHttp()
 }

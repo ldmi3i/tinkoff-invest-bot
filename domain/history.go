@@ -2,26 +2,27 @@ package domain
 
 import (
 	"github.com/shopspring/decimal"
+	"invest-robot/convert"
 	investapi "invest-robot/tapigen"
 	"time"
 )
 
 type History struct {
-	ID    uint `gorm:"primaryKey"`
-	Open  decimal.Decimal
-	Low   decimal.Decimal
-	High  decimal.Decimal
-	Close decimal.Decimal
+	ID    uint            `gorm:"primaryKey"`
+	Open  decimal.Decimal `gorm:"type:numeric"`
+	Low   decimal.Decimal `gorm:"type:numeric"`
+	High  decimal.Decimal `gorm:"type:numeric"`
+	Close decimal.Decimal `gorm:"type:numeric"`
 	Date  time.Time
 }
 
 func FromCandle(c *investapi.Candle) History {
 	return History{
 		ID:    0,
-		Open:  decimal.New(c.Open.Units, c.Open.Nano),
-		Low:   decimal.New(c.Low.Units, c.Low.Nano),
-		High:  decimal.New(c.High.Units, c.High.Nano),
-		Close: decimal.New(c.Close.Units, c.Close.Nano),
+		Open:  convert.QuotationToDec(c.Open),
+		Low:   convert.QuotationToDec(c.Low),
+		High:  convert.QuotationToDec(c.High),
+		Close: convert.QuotationToDec(c.Close),
 		Date:  c.Time.AsTime(),
 	}
 }
@@ -29,10 +30,14 @@ func FromCandle(c *investapi.Candle) History {
 func FromHistoricCandle(c *investapi.HistoricCandle) History {
 	return History{
 		ID:    0,
-		Open:  decimal.New(c.Open.Units, c.Open.Nano),
-		Low:   decimal.New(c.Low.Units, c.Low.Nano),
-		High:  decimal.New(c.High.Units, c.High.Nano),
-		Close: decimal.New(c.Close.Units, c.Close.Nano),
+		Open:  convert.QuotationToDec(c.Open),
+		Low:   convert.QuotationToDec(c.Low),
+		High:  convert.QuotationToDec(c.High),
+		Close: convert.QuotationToDec(c.Close),
 		Date:  c.Time.AsTime(),
 	}
+}
+
+func (History) TableName() string {
+	return "history"
 }

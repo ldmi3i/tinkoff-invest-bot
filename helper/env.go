@@ -13,6 +13,9 @@ var dbHost string
 var dbPort string
 var dbName string
 
+var srvHost string
+var srvPort string
+
 func initEnv() {
 	sanityCheck("TIN_TOKEN")
 	tinToken = os.Getenv("TIN_TOKEN")
@@ -24,6 +27,9 @@ func initEnv() {
 	dbHost = getOrDefault("DB_HOST", "localhost")
 	dbPort = getOrDefault("DB_PORT", "5432")
 	dbName = getOrDefault("DB_NAME", "invest-bot")
+
+	srvHost = getOrDefault("SERVER_HOST", "localhost")
+	srvPort = getOrDefault("SERVER_PORT", "8017")
 }
 
 func getOrDefault(env string, def string) string {
@@ -67,4 +73,12 @@ func GetDbPort() string {
 
 func GetDbName() string {
 	return dbName
+}
+
+func GetSrvHost() string {
+	return srvHost
+}
+
+func GetSrvPort() string {
+	return srvPort
 }

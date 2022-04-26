@@ -33,15 +33,15 @@ func (t DefaultTinApi) GetOrderBook() (*investapi.GetOrderBookResponse, error) {
 	return book, nil
 }
 
-func (t DefaultTinApi) GetHistory(figis []string, startDate time.Time, endDate time.Time) ([]*investapi.GetCandlesResponse, error) {
-	var resps = make([]*investapi.GetCandlesResponse, len(figis), 0)
+func (t DefaultTinApi) GetHistory(figis []string, ivl investapi.CandleInterval, startDate time.Time, endDate time.Time) ([]*investapi.GetCandlesResponse, error) {
+	var resps = make([]*investapi.GetCandlesResponse, 0, len(figis))
 	ctx := contextWithAuth(context.Background())
 	for _, figi := range figis {
 		req := investapi.GetCandlesRequest{
 			Figi:     figi,
 			From:     timestamppb.New(startDate),
 			To:       timestamppb.New(endDate),
-			Interval: 3, //TODO parametrize
+			Interval: ivl,
 		}
 		data, err := t.mcl.GetCandles(ctx, &req)
 		if err != nil {

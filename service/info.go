@@ -9,14 +9,14 @@ import (
 
 type InfoSrv interface {
 	GetOrderBook() (*investapi.GetOrderBookResponse, error)
-	GetHistory(finis []string, startDate time.Time, endDate time.Time) ([]domain.History, error)
+	GetHistory(finis []string, ivl investapi.CandleInterval, startDate time.Time, endDate time.Time) ([]domain.History, error)
 }
 
 type DefaultInfoSrv struct {
 	tapi tinapi.TinApi
 }
 
-func NewInfoSrv(t tinapi.TinApi) InfoSrv {
+func NewInfoService(t tinapi.TinApi) InfoSrv {
 	return DefaultInfoSrv{t}
 }
 
@@ -24,8 +24,8 @@ func (i DefaultInfoSrv) GetOrderBook() (*investapi.GetOrderBookResponse, error) 
 	return i.tapi.GetOrderBook()
 }
 
-func (i DefaultInfoSrv) GetHistory(finis []string, startDate time.Time, endDate time.Time) ([]domain.History, error) {
-	respArr, err := i.tapi.GetHistory(finis, startDate, endDate)
+func (i DefaultInfoSrv) GetHistory(finis []string, ivl investapi.CandleInterval, startDate time.Time, endDate time.Time) ([]domain.History, error) {
+	respArr, err := i.tapi.GetHistory(finis, ivl, startDate, endDate)
 	if err != nil {
 		return nil, err
 	}

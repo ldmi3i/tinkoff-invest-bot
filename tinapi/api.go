@@ -7,5 +7,5 @@ import (
 
 type TinApi interface {
 	GetOrderBook() (*investapi.GetOrderBookResponse, error)
-	GetHistory(figis []string, startDate time.Time, endDate time.Time) ([]*investapi.GetCandlesResponse, error)
+	GetHistory(figis []string, ivl investapi.CandleInterval, startDate time.Time, endDate time.Time) ([]*investapi.GetCandlesResponse, error)
 }

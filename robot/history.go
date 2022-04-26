@@ -1,7 +1,8 @@
 package robot
 
 import (
-	"invest-robot/errors"
+	"invest-robot/helper"
+	"invest-robot/service"
 	investapi "invest-robot/tapigen"
 	"time"
 )
@@ -11,13 +12,21 @@ type HistoryAPI interface {
 }
 
 type DefaultHistoryAPI struct {
-	dsrv investapi.MarketDataServiceClient
+	infoSrv service.InfoSrv
 }
 
 func (h DefaultHistoryAPI) LoadHistory(figis []string, startTime time.Time, endTime time.Time) error {
-	return errors.NewUnexpectedError("Not implemented yet!") //todo implement me!
+	history, err := h.infoSrv.GetHistory(figis, investapi.CandleInterval_CANDLE_INTERVAL_DAY, startTime, endTime)
+	if err != nil {
+		return err
+	}
+	db := helper.GetDB()
+
+	db.Exec("DELETE FROM history")
+	db.Create(&history)
+	return nil
 }
 
-func NewHistoryAPI() HistoryAPI {
-	return DefaultHistoryAPI{}
+func NewHistoryAPI(infoSrv service.InfoSrv) HistoryAPI {
+	return DefaultHistoryAPI{infoSrv}
 }
