@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"invest-robot/helper"
+	"invest-robot/repository"
 	"invest-robot/robot"
 	"invest-robot/service"
+	"invest-robot/strategy"
 	"invest-robot/tinapi"
 	"log"
 )
@@ -19,11 +21,11 @@ func StartHttp() {
 }
 
 func historyHandlers(router *gin.Engine) {
-	hh := NewHistoryHandler(
-		robot.NewHistoryAPI(
-			service.NewInfoService(tinapi.NewTinApi()),
-		),
-	)
+	infoSrv := service.NewInfoService(tinapi.NewTinApi())
+	hRep := repository.NewHistoryRepository(helper.GetDB())
+	aFact := strategy.NewAlgFactory(&infoSrv, &hRep)
+	aRep := repository.NewAlgoRepository()
+	hh := NewHistoryHandler(robot.NewHistoryAPI(infoSrv, hRep, aFact, aRep))
 
 	router.POST("/history/load", hh.LoadHistory)
 }

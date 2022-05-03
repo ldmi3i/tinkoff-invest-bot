@@ -11,3 +11,20 @@ func (msg msgError) Error() string {
 func NewUnexpectedError(msg string) error {
 	return msgError{msg}
 }
+
+type doubleSubErr struct {
+	m string
+}
+
+func (msg doubleSubErr) Error() string {
+	return msg.m
+}
+
+func NewDoubleSubErr(msg string) error {
+	return doubleSubErr{msg}
+}
+
+// NewNotImplemented auxiliary - to mark not implemented
+func NewNotImplemented() error {
+	return NewUnexpectedError("Not implemented yet!")
+}

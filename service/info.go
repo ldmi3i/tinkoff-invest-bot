@@ -11,6 +11,7 @@ import (
 type InfoSrv interface {
 	GetOrderBook() (*investapi.GetOrderBookResponse, error)
 	GetHistory(finis []string, ivl investapi.CandleInterval, startTime time.Time, endTime time.Time) ([]domain.History, error)
+	GetDataStream() (*investapi.MarketDataStreamService_MarketDataStreamClient, error)
 }
 
 type DefaultInfoSrv struct {
@@ -25,19 +26,19 @@ func (i DefaultInfoSrv) GetOrderBook() (*investapi.GetOrderBookResponse, error) 
 	return i.tapi.GetOrderBook()
 }
 
-func (i DefaultInfoSrv) GetHistory(finis []string, ivl investapi.CandleInterval, startTime time.Time, endTime time.Time) ([]domain.History, error) {
+func (i DefaultInfoSrv) GetHistory(figis []string, ivl investapi.CandleInterval, startTime time.Time, endTime time.Time) ([]domain.History, error) {
 	next, err := nextTime(ivl, startTime)
 	if err != nil {
 		return nil, err
 	}
 	var hist []domain.History
 	if next.After(endTime) {
-		hist, err = i.getHistRow(finis, ivl, startTime, endTime)
+		hist, err = i.tapi.GetHistory(figis, ivl, startTime, endTime)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		if hist, err = i.getHistRow(finis, ivl, startTime, *next); err != nil {
+		if hist, err = i.tapi.GetHistory(figis, ivl, startTime, *next); err != nil {
 			return nil, err
 		}
 		curr := next
@@ -45,7 +46,7 @@ func (i DefaultInfoSrv) GetHistory(finis []string, ivl investapi.CandleInterval,
 			return nil, err
 		}
 		for next.Before(endTime) {
-			row, err := i.getHistRow(finis, ivl, *curr, *next)
+			row, err := i.tapi.GetHistory(figis, ivl, *curr, *next)
 			if err != nil {
 				return nil, err
 			}
@@ -55,26 +56,11 @@ func (i DefaultInfoSrv) GetHistory(finis []string, ivl investapi.CandleInterval,
 				return nil, err
 			}
 		}
-		row, err := i.getHistRow(finis, ivl, *curr, endTime)
+		row, err := i.tapi.GetHistory(figis, ivl, *curr, endTime)
 		if err != nil {
 			return nil, err
 		}
 		hist = append(hist, row...)
-	}
-	return hist, nil
-}
-
-func (i DefaultInfoSrv) getHistRow(finis []string, ivl investapi.CandleInterval, startTime time.Time, endTime time.Time) ([]domain.History, error) {
-	hist := make([]domain.History, 0)
-	respArr, err := i.tapi.GetHistory(finis, ivl, startTime, endTime)
-	if err != nil {
-		return nil, err
-	}
-	for _, resp := range respArr {
-		for _, cndl := range resp.GetCandles() {
-			histRec := domain.FromHistoricCandle(cndl)
-			hist = append(hist, histRec)
-		}
 	}
 	return hist, nil
 }
@@ -95,4 +81,8 @@ func nextTime(ivl investapi.CandleInterval, startTime time.Time) (*time.Time, er
 	default:
 		return nil, errors.NewUnexpectedError("Unexpected candle interval: " + ivl.String())
 	}
+}
+
+func (i DefaultInfoSrv) GetDataStream() (*investapi.MarketDataStreamService_MarketDataStreamClient, error) {
+	return i.tapi.GetDataStream()
 }

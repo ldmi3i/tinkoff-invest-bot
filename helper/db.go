@@ -28,7 +28,8 @@ func initDB() {
 func migrate() error {
 	return db.AutoMigrate(
 		&domain.History{},
-		&domain.Trace{},
+		&domain.Algorithm{},
+		&domain.Action{},
 	)
 }
 

@@ -1,18 +1,26 @@
 package robot
 
 import (
-	"invest-robot/helper"
+	"invest-robot/domain"
+	"invest-robot/dto"
+	"invest-robot/repository"
 	"invest-robot/service"
+	"invest-robot/strategy"
 	investapi "invest-robot/tapigen"
+	"invest-robot/trade"
 	"time"
 )
 
 type HistoryAPI interface {
 	LoadHistory(figis []string, ivl investapi.CandleInterval, startTime time.Time, endTime time.Time) error
+	AnalyzeHistory(req dto.CreateAlgorithmRequest) (*dto.HistStatResponse, error)
 }
 
 type DefaultHistoryAPI struct {
 	infoSrv service.InfoSrv
+	histRep repository.HistoryRepository
+	aFact   strategy.AlgFactory
+	aRep    repository.AlgoRepository
 }
 
 func (h DefaultHistoryAPI) LoadHistory(figis []string, ivl investapi.CandleInterval, startTime time.Time, endTime time.Time) error {
@@ -20,13 +28,32 @@ func (h DefaultHistoryAPI) LoadHistory(figis []string, ivl investapi.CandleInter
 	if err != nil {
 		return err
 	}
-	db := helper.GetDB()
-
-	db.Exec("DELETE FROM history")
-	db.Create(&history)
+	if err = h.histRep.SaveAll(history); err != nil {
+		return err
+	}
 	return nil
 }
 
-func NewHistoryAPI(infoSrv service.InfoSrv) HistoryAPI {
-	return DefaultHistoryAPI{infoSrv}
+func (h DefaultHistoryAPI) AnalyzeHistory(req dto.CreateAlgorithmRequest) (*dto.HistStatResponse, error) {
+	algDm := domain.AlgorithmFromDto(req)
+	alg, err := h.aFact.NewHist(algDm)
+	if err != nil {
+		return nil, err
+	}
+	sub, err := alg.Subscribe()
+	if err != nil {
+		return nil, err
+	}
+
+	trDr := trade.NewMockTrader(h.histRep)
+	if err = trDr.AddSubscription(sub); err != nil {
+		return nil, err
+	}
+	res := <-trDr.GetStatCh()
+	return &res, nil
+}
+
+func NewHistoryAPI(infoSrv service.InfoSrv, histRep repository.HistoryRepository, aFact strategy.AlgFactory,
+	aRep repository.AlgoRepository) HistoryAPI {
+	return DefaultHistoryAPI{infoSrv, histRep, aFact, aRep}
 }

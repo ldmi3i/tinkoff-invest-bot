@@ -36,5 +36,21 @@ func (h DefaultHistoryHandler) LoadHistory(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, err.Error())
 		return
 	}
+}
 
+func (h DefaultHistoryHandler) AnalyzeHistory(c *gin.Context) {
+	var req dto.CreateAlgorithmRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("Error while validating AnalyzeHistory request:\n%s", err)
+		c.JSON(http.StatusBadRequest, err.Error())
+		return
+	}
+	log.Printf("Analyze history: %+v", req)
+	stat, err := h.api.AnalyzeHistory(req)
+	if err != nil {
+		log.Printf("Error while analyzing history:\n%s", err)
+		c.JSON(http.StatusInternalServerError, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, stat)
 }

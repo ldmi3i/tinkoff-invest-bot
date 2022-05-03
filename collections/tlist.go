@@ -31,7 +31,8 @@ func (n TListNode[T]) Next() *TListNode[T] {
 }
 
 // Append data to the end of list and remove first elements out of data
-func (t *TList[T]) Append(data T, tm time.Time) {
+// Returns true if at least one element was removed
+func (t *TList[T]) Append(data T, tm time.Time) bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	node := TListNode[T]{data: data, time: tm}
@@ -45,44 +46,46 @@ func (t *TList[T]) Append(data T, tm time.Time) {
 		t.last = &node
 	}
 	t.size += 1
-	t.removeOutOfTime()
+	return t.removeOutOfTime()
 }
 
-func (t *TList[T]) removeOutOfTime() {
+func (t *TList[T]) removeOutOfTime() bool {
 	if t.last == nil {
 		log.Println("removeOutOfTime called on empty TList...")
-		return
+		return false
 	}
+	res := false
 	for t.last.time.Sub(t.first.time) > t.d {
-		t.removeFirst()
+		res = res || t.removeFirst()
 	}
+	return res
 }
 
 // RemoveFirst removes first element from TList
-func (t *TList[T]) RemoveFirst() {
+func (t *TList[T]) RemoveFirst() bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	t.removeFirst()
+	return t.removeFirst()
 }
 
-func (t *TList[T]) removeFirst() {
+func (t *TList[T]) removeFirst() bool {
 	if t.first == nil {
 		log.Println("Called removing first on empty TList...")
 		//empty case
-		return
+		return false
 	}
 	if t.first.next == nil {
 		//one element case
 		t.first.next = nil //remove link to second
 		t.first = nil
 		t.last = nil
-		return
 	} else {
 		second := t.first.next
 		t.first.next = nil //remove link to second
 		t.first = second
 	}
 	t.size -= 1
+	return true
 }
 
 func (t TList[T]) GetSize() uint {
@@ -95,6 +98,10 @@ func (t TList[T]) First() *TListNode[T] {
 
 func (t TList[T]) Last() *TListNode[T] {
 	return t.last
+}
+
+func (t TList[T]) IsEmpty() bool {
+	return t.first == nil
 }
 
 func NewTList[T any](d time.Duration) TList[T] {

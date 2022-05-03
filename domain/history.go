@@ -8,12 +8,13 @@ import (
 )
 
 type History struct {
-	ID    uint            `gorm:"primaryKey"`
+	ID    uint `gorm:"primaryKey"`
+	Figi  string
 	Open  decimal.Decimal `gorm:"type:numeric"`
 	Low   decimal.Decimal `gorm:"type:numeric"`
 	High  decimal.Decimal `gorm:"type:numeric"`
 	Close decimal.Decimal `gorm:"type:numeric"`
-	Date  time.Time
+	Time  time.Time
 }
 
 func FromCandle(c *investapi.Candle) History {
@@ -23,7 +24,7 @@ func FromCandle(c *investapi.Candle) History {
 		Low:   convert.QuotationToDec(c.Low),
 		High:  convert.QuotationToDec(c.High),
 		Close: convert.QuotationToDec(c.Close),
-		Date:  c.Time.AsTime(),
+		Time:  c.Time.AsTime(),
 	}
 }
 
@@ -34,7 +35,7 @@ func FromHistoricCandle(c *investapi.HistoricCandle) History {
 		Low:   convert.QuotationToDec(c.Low),
 		High:  convert.QuotationToDec(c.High),
 		Close: convert.QuotationToDec(c.Close),
-		Date:  c.Time.AsTime(),
+		Time:  c.Time.AsTime(),
 	}
 }
 
