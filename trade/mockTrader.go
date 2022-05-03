@@ -15,7 +15,6 @@ type MockTrader struct {
 	hRep         repository.HistoryRepository
 	sub          *model.Subscription
 	statCh       chan dto.HistStatResponse
-	figis        []string                //figi list
 	lotNums      map[string]int64        //number of lots per buy
 	figiCurrency map[string]string       //currency to instrument figi relation
 	figiHist     map[string][]histRecord //history of each figi - to convenience interpolation
@@ -170,12 +169,16 @@ func (t MockTrader) calcMoneyStat(lastTime time.Time, resAmount map[string]decim
 }
 
 func (t *MockTrader) populateHistory() error {
-	history, err := (t.hRep).FindAllByFigis(t.figis)
+	figis := make([]string, 0, len(t.figiCurrency))
+	for figi := range t.figiCurrency {
+		figis = append(figis, figi)
+	}
+	history, err := t.hRep.FindAllByFigis(figis)
 	if err != nil {
 		return err
 	}
 	t.figiHist = make(map[string][]histRecord)
-	for _, figi := range t.figis {
+	for _, figi := range figis {
 		t.figiHist[figi] = make([]histRecord, 0)
 	}
 	for _, hRec := range history {
@@ -221,4 +224,8 @@ func (t *MockTrader) RemoveSubscription(id uint) error {
 
 func (t MockTrader) GetStatCh() chan dto.HistStatResponse {
 	return t.statCh
+}
+
+func NewMockTrader(hRep repository.HistoryRepository, lotNums map[string]int64, figiCurrency map[string]string) MockTrader {
+	return MockTrader{statCh: make(chan dto.HistStatResponse), hRep: hRep}
 }

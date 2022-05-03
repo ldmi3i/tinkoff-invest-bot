@@ -12,6 +12,7 @@ type InfoSrv interface {
 	GetOrderBook() (*investapi.GetOrderBookResponse, error)
 	GetHistory(finis []string, ivl investapi.CandleInterval, startTime time.Time, endTime time.Time) ([]domain.History, error)
 	GetDataStream() (*investapi.MarketDataStreamService_MarketDataStreamClient, error)
+	GetAllShares() (*investapi.SharesResponse, error)
 }
 
 type DefaultInfoSrv struct {
@@ -85,4 +86,8 @@ func nextTime(ivl investapi.CandleInterval, startTime time.Time) (*time.Time, er
 
 func (i DefaultInfoSrv) GetDataStream() (*investapi.MarketDataStreamService_MarketDataStreamClient, error) {
 	return i.tapi.GetDataStream()
+}
+
+func (i DefaultInfoSrv) GetAllShares() (*investapi.SharesResponse, error) {
+	return i.tapi.GetAllShares()
 }

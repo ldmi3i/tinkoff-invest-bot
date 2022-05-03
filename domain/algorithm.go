@@ -44,9 +44,11 @@ func AlgorithmFromDto(req dto.CreateAlgorithmRequest) Algorithm {
 		params = append(params, Param{Key: key, Value: val})
 	}
 	return Algorithm{
-		Strategy: req.Strategy,
-		Figis:    req.Figis,
-		Params:   params,
-		IsActive: true,
+		Strategy:   req.Strategy,
+		Figis:      req.Figis,
+		Currencies: req.Currencies,
+		Limits:     req.Limits,
+		Params:     params,
+		IsActive:   true,
 	}
 }

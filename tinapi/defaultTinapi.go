@@ -13,12 +13,14 @@ import (
 type DefaultTinApi struct {
 	mcl  investapi.MarketDataServiceClient
 	mcls investapi.MarketDataStreamServiceClient
+	icl  investapi.InstrumentsServiceClient
 }
 
 func NewTinApi() TinApi {
 	return DefaultTinApi{
 		investapi.NewMarketDataServiceClient(helper.GetClient()),
 		investapi.NewMarketDataStreamServiceClient(helper.GetClient()),
+		investapi.NewInstrumentsServiceClient(helper.GetClient()),
 	}
 }
 
@@ -71,4 +73,14 @@ func (t DefaultTinApi) GetDataStream() (*investapi.MarketDataStreamService_Marke
 		return nil, err
 	}
 	return &stream, nil
+}
+
+func (t DefaultTinApi) GetAllShares() (*investapi.SharesResponse, error) {
+	ctx := contextWithAuth(context.Background())
+	req := investapi.InstrumentsRequest{InstrumentStatus: investapi.InstrumentStatus_INSTRUMENT_STATUS_BASE}
+	shares, err := t.icl.Shares(ctx, &req)
+	if err != nil {
+		return nil, err
+	}
+	return shares, nil
 }

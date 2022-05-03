@@ -11,6 +11,7 @@ import (
 
 type HistoryHandler interface {
 	LoadHistory(c *gin.Context)
+	AnalyzeHistory(c *gin.Context)
 }
 
 type DefaultHistoryHandler struct {

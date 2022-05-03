@@ -44,8 +44,24 @@ func (h DefaultHistoryAPI) AnalyzeHistory(req dto.CreateAlgorithmRequest) (*dto.
 	if err != nil {
 		return nil, err
 	}
-
-	trDr := trade.NewMockTrader(h.histRep)
+	shares, err := h.infoSrv.GetAllShares()
+	if err != nil {
+		return nil, err
+	}
+	figiSet := make(map[string]bool)
+	for _, figi := range req.Figis {
+		figiSet[figi] = true
+	}
+	lotNum := make(map[string]int64)
+	figiCurrency := make(map[string]string)
+	for _, instr := range shares.Instruments {
+		if !figiSet[instr.Figi] {
+			continue
+		}
+		lotNum[instr.Figi] = int64(instr.Lot)
+		figiCurrency[instr.Figi] = instr.Currency
+	}
+	trDr := trade.NewMockTrader(h.histRep, lotNum, figiCurrency)
 	if err = trDr.AddSubscription(sub); err != nil {
 		return nil, err
 	}

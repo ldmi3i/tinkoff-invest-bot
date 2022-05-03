@@ -1,8 +1,6 @@
 package trade
 
 import (
-	"invest-robot/dto"
-	"invest-robot/repository"
 	"invest-robot/strategy/model"
 )
 
@@ -17,8 +15,4 @@ func NewProdApiTrader() Trader {
 
 func NewSandboxTrader() Trader {
 	return &SandboxTrader{}
-}
-
-func NewMockTrader(hRep repository.HistoryRepository) MockTrader {
-	return MockTrader{statCh: make(chan dto.HistStatResponse), hRep: hRep}
 }

@@ -28,4 +28,5 @@ func historyHandlers(router *gin.Engine) {
 	hh := NewHistoryHandler(robot.NewHistoryAPI(infoSrv, hRep, aFact, aRep))
 
 	router.POST("/history/load", hh.LoadHistory)
+	router.POST("/history/analyze", hh.AnalyzeHistory)
 }

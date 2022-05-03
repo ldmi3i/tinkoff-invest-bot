@@ -29,7 +29,7 @@ func (h PgHistoryRepository) FindAll() ([]domain.History, error) {
 
 func (h PgHistoryRepository) FindAllByFigis(figis []string) ([]domain.History, error) {
 	var hist []domain.History
-	h.db.Where("figi in ?", figis).Order("date").Find(&hist)
+	h.db.Where("figi in ?", figis).Order("time").Find(&hist)
 	return hist, nil
 }
 
