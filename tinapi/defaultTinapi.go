@@ -67,12 +67,12 @@ func contextWithAuth(ctx context.Context) context.Context {
 	return metadata.NewOutgoingContext(ctx, md)
 }
 
-func (t DefaultTinApi) GetDataStream() (*investapi.MarketDataStreamService_MarketDataStreamClient, error) {
+func (t DefaultTinApi) GetDataStream() (investapi.MarketDataStreamService_MarketDataStreamClient, error) {
 	stream, err := t.mcls.MarketDataStream(context.Background())
 	if err != nil {
 		return nil, err
 	}
-	return &stream, nil
+	return stream, nil
 }
 
 func (t DefaultTinApi) GetAllShares() (*investapi.SharesResponse, error) {

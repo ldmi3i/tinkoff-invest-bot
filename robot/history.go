@@ -14,7 +14,7 @@ import (
 
 type HistoryAPI interface {
 	LoadHistory(figis []string, ivl investapi.CandleInterval, startTime time.Time, endTime time.Time) error
-	AnalyzeHistory(req dto.CreateAlgorithmRequest) (*dto.HistStatResponse, error)
+	AnalyzeHistory(req *dto.CreateAlgorithmRequest) (*dto.HistStatResponse, error)
 }
 
 type DefaultHistoryAPI struct {
@@ -35,7 +35,7 @@ func (h DefaultHistoryAPI) LoadHistory(figis []string, ivl investapi.CandleInter
 	return nil
 }
 
-func (h DefaultHistoryAPI) AnalyzeHistory(req dto.CreateAlgorithmRequest) (*dto.HistStatResponse, error) {
+func (h DefaultHistoryAPI) AnalyzeHistory(req *dto.CreateAlgorithmRequest) (*dto.HistStatResponse, error) {
 	algDm := domain.AlgorithmFromDto(req)
 	alg, err := h.aFact.NewHist(algDm)
 	if err != nil {

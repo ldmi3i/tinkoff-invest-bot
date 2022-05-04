@@ -38,12 +38,12 @@ func ParamsToMap(params []Param) map[string]string {
 	return res
 }
 
-func AlgorithmFromDto(req dto.CreateAlgorithmRequest) Algorithm {
+func AlgorithmFromDto(req *dto.CreateAlgorithmRequest) *Algorithm {
 	params := make([]Param, 0, len(req.Params))
 	for key, val := range req.Params {
 		params = append(params, Param{Key: key, Value: val})
 	}
-	return Algorithm{
+	return &Algorithm{
 		Strategy:   req.Strategy,
 		Figis:      req.Figis,
 		Currencies: req.Currencies,

@@ -47,7 +47,7 @@ func (h DefaultHistoryHandler) AnalyzeHistory(c *gin.Context) {
 		return
 	}
 	log.Printf("Analyze history: %+v", req)
-	stat, err := h.api.AnalyzeHistory(req)
+	stat, err := h.api.AnalyzeHistory(&req)
 	if err != nil {
 		log.Printf("Error while analyzing history:\n%s", err)
 		c.JSON(http.StatusInternalServerError, err.Error())

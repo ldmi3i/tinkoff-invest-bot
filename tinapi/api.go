@@ -9,6 +9,6 @@ import (
 type TinApi interface {
 	GetOrderBook() (*investapi.GetOrderBookResponse, error)
 	GetHistory(figis []string, ivl investapi.CandleInterval, startDate time.Time, endDate time.Time) ([]domain.History, error)
-	GetDataStream() (*investapi.MarketDataStreamService_MarketDataStreamClient, error)
+	GetDataStream() (investapi.MarketDataStreamService_MarketDataStreamClient, error)
 	GetAllShares() (*investapi.SharesResponse, error)
 }

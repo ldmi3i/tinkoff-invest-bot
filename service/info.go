@@ -11,7 +11,7 @@ import (
 type InfoSrv interface {
 	GetOrderBook() (*investapi.GetOrderBookResponse, error)
 	GetHistory(finis []string, ivl investapi.CandleInterval, startTime time.Time, endTime time.Time) ([]domain.History, error)
-	GetDataStream() (*investapi.MarketDataStreamService_MarketDataStreamClient, error)
+	GetDataStream() (investapi.MarketDataStreamService_MarketDataStreamClient, error)
 	GetAllShares() (*investapi.SharesResponse, error)
 }
 
@@ -20,14 +20,14 @@ type DefaultInfoSrv struct {
 }
 
 func NewInfoService(t tinapi.TinApi) InfoSrv {
-	return DefaultInfoSrv{t}
+	return &DefaultInfoSrv{t}
 }
 
-func (i DefaultInfoSrv) GetOrderBook() (*investapi.GetOrderBookResponse, error) {
+func (i *DefaultInfoSrv) GetOrderBook() (*investapi.GetOrderBookResponse, error) {
 	return i.tapi.GetOrderBook()
 }
 
-func (i DefaultInfoSrv) GetHistory(figis []string, ivl investapi.CandleInterval, startTime time.Time, endTime time.Time) ([]domain.History, error) {
+func (i *DefaultInfoSrv) GetHistory(figis []string, ivl investapi.CandleInterval, startTime time.Time, endTime time.Time) ([]domain.History, error) {
 	next, err := nextTime(ivl, startTime)
 	if err != nil {
 		return nil, err
@@ -84,10 +84,10 @@ func nextTime(ivl investapi.CandleInterval, startTime time.Time) (*time.Time, er
 	}
 }
 
-func (i DefaultInfoSrv) GetDataStream() (*investapi.MarketDataStreamService_MarketDataStreamClient, error) {
+func (i *DefaultInfoSrv) GetDataStream() (investapi.MarketDataStreamService_MarketDataStreamClient, error) {
 	return i.tapi.GetDataStream()
 }
 
-func (i DefaultInfoSrv) GetAllShares() (*investapi.SharesResponse, error) {
+func (i *DefaultInfoSrv) GetAllShares() (*investapi.SharesResponse, error) {
 	return i.tapi.GetAllShares()
 }

@@ -13,7 +13,7 @@ import (
 type AlgorithmImpl struct {
 	id         uint
 	isActive   bool
-	dataProc   *DataProc
+	dataProc   DataProc
 	figis      []string
 	currencies []string
 	limits     []decimal.Decimal
@@ -52,12 +52,12 @@ func (a AlgorithmImpl) IsActive() bool {
 }
 
 func (a *AlgorithmImpl) Go() error {
-	ch, err := (*a.dataProc).GetDataStream()
+	ch, err := a.dataProc.GetDataStream()
 	if err != nil {
 		return err
 	}
 	go a.procBg(ch)
-	(*a.dataProc).Go()
+	a.dataProc.Go()
 	a.isActive = true
 	return nil
 }
@@ -176,15 +176,15 @@ func (a *AlgorithmImpl) Configure(ctx []domain.CtxParam) error {
 	return errors.NewNotImplemented()
 }
 
-func NewProd(algo domain.Algorithm, infoSrv *service.InfoSrv) (stmodel.Algorithm, error) {
-	proc, err := newApiDataProc(algo, infoSrv)
+func NewProd(algo *domain.Algorithm, hRep repository.HistoryRepository, infoSrv service.InfoSrv) (stmodel.Algorithm, error) {
+	proc, err := newProdDataProc(algo, hRep, infoSrv)
 	if err != nil {
 		return nil, err
 	}
 	return &AlgorithmImpl{
 		id:         algo.ID,
 		isActive:   true,
-		dataProc:   &proc,
+		dataProc:   proc,
 		figis:      algo.Figis,
 		currencies: algo.Currencies,
 		limits:     algo.Limits,
@@ -192,7 +192,23 @@ func NewProd(algo domain.Algorithm, infoSrv *service.InfoSrv) (stmodel.Algorithm
 	}, nil
 }
 
-func NewHist(algo domain.Algorithm, hRep *repository.HistoryRepository) (stmodel.Algorithm, error) {
+func NewSandbox(algo *domain.Algorithm, hRep repository.HistoryRepository, infoSrv service.InfoSrv) (stmodel.Algorithm, error) {
+	proc, err := newSandboxDataProc(algo, hRep, infoSrv)
+	if err != nil {
+		return nil, err
+	}
+	return &AlgorithmImpl{
+		id:         algo.ID,
+		isActive:   true,
+		dataProc:   proc,
+		figis:      algo.Figis,
+		currencies: algo.Currencies,
+		limits:     algo.Limits,
+		param:      domain.ParamsToMap(algo.Params),
+	}, nil
+}
+
+func NewHist(algo *domain.Algorithm, hRep repository.HistoryRepository) (stmodel.Algorithm, error) {
 	proc, err := newHistoryDataProc(algo, hRep)
 	if err != nil {
 		return nil, err
@@ -200,7 +216,7 @@ func NewHist(algo domain.Algorithm, hRep *repository.HistoryRepository) (stmodel
 	return &AlgorithmImpl{
 		id:         algo.ID,
 		isActive:   true,
-		dataProc:   &proc,
+		dataProc:   proc,
 		figis:      algo.Figis,
 		currencies: algo.Currencies,
 		limits:     algo.Limits,
