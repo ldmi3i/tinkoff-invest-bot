@@ -1,11 +1,9 @@
 package trade
 
-import (
-	"invest-robot/strategy/model"
-)
+import "invest-robot/strategy/stmodel"
 
 type Trader interface {
-	AddSubscription(sub *model.Subscription) error
+	AddSubscription(sub *stmodel.Subscription) error
 	RemoveSubscription(id uint) error
 }
 

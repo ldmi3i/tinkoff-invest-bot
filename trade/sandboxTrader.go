@@ -2,13 +2,13 @@ package trade
 
 import (
 	"invest-robot/errors"
-	"invest-robot/strategy/model"
+	"invest-robot/strategy/stmodel"
 )
 
 type SandboxTrader struct {
 }
 
-func (at *SandboxTrader) AddSubscription(sub *model.Subscription) error {
+func (at *SandboxTrader) AddSubscription(sub *stmodel.Subscription) error {
 	return errors.NewNotImplemented()
 }
 

@@ -6,7 +6,7 @@ import (
 	"invest-robot/errors"
 	"invest-robot/repository"
 	"invest-robot/service"
-	"invest-robot/strategy/model"
+	"invest-robot/strategy/stmodel"
 	"log"
 )
 
@@ -18,8 +18,8 @@ type AlgorithmImpl struct {
 	currencies []string
 	limits     []decimal.Decimal
 	param      map[string]string
-	aChan      chan model.ActionReq
-	arChan     chan model.ActionResp
+	aChan      chan stmodel.ActionReq
+	arChan     chan stmodel.ActionResp
 }
 
 type algoStatus int
@@ -35,16 +35,16 @@ type AlgoData struct {
 	instrAmount map[string]int64
 }
 
-func (a *AlgorithmImpl) Subscribe() (*model.Subscription, error) {
+func (a *AlgorithmImpl) Subscribe() (*stmodel.Subscription, error) {
 	if a.aChan != nil || a.arChan != nil {
 		return nil, errors.NewDoubleSubErr("Avr algorithm multiple subscription not implemented")
 	}
-	aCh := make(chan model.ActionReq, 1) //must not block algorithm, so size = 1
+	aCh := make(chan stmodel.ActionReq, 1) //must not block algorithm, so size = 1
 	a.aChan = aCh
 
-	arCh := make(chan model.ActionResp, 1) //must not block trader, so size = 1
+	arCh := make(chan stmodel.ActionResp, 1) //must not block trader, so size = 1
 	a.arChan = arCh
-	return &model.Subscription{AlgoID: a.id, AChan: a.aChan, RChan: a.arChan}, nil
+	return &stmodel.Subscription{AlgoID: a.id, AChan: a.aChan, RChan: a.arChan}, nil
 }
 
 func (a AlgorithmImpl) IsActive() bool {
@@ -103,13 +103,9 @@ func (a *AlgorithmImpl) procBg(datCh <-chan procData) {
 }
 
 //process response from trade.Trader after pass trading stages
-func (a *AlgorithmImpl) processTraderResp(aDat *AlgoData, resp *model.ActionResp) error {
+func (a *AlgorithmImpl) processTraderResp(aDat *AlgoData, resp *stmodel.ActionResp) error {
 	action := resp.Action
-	if resp.IsSuccess {
-		//iAmount, exists := aDat.instrAmount[action.InstrFigi]
-		//if !exists {
-		//	aDat.instrAmount[action.InstrFigi] = iAmount
-		//}
+	if resp.Action.Status == domain.SUCCESS {
 		iAmount := action.InstrAmount
 		if action.Direction == domain.SELL {
 			iAmount = -iAmount
@@ -164,8 +160,8 @@ func (a *AlgorithmImpl) processData(aDat *AlgoData, pDat *procData) {
 	}
 }
 
-func (a *AlgorithmImpl) makeReq(action domain.Action) model.ActionReq {
-	return model.ActionReq{
+func (a *AlgorithmImpl) makeReq(action domain.Action) stmodel.ActionReq {
+	return stmodel.ActionReq{
 		Action:     action,
 		Currencies: a.currencies,
 		Limits:     a.limits,
@@ -180,7 +176,7 @@ func (a *AlgorithmImpl) Configure(ctx []domain.CtxParam) error {
 	return errors.NewNotImplemented()
 }
 
-func NewProd(algo domain.Algorithm, infoSrv *service.InfoSrv) (model.Algorithm, error) {
+func NewProd(algo domain.Algorithm, infoSrv *service.InfoSrv) (stmodel.Algorithm, error) {
 	proc, err := newApiDataProc(algo, infoSrv)
 	if err != nil {
 		return nil, err
@@ -196,7 +192,7 @@ func NewProd(algo domain.Algorithm, infoSrv *service.InfoSrv) (model.Algorithm, 
 	}, nil
 }
 
-func NewHist(algo domain.Algorithm, hRep *repository.HistoryRepository) (model.Algorithm, error) {
+func NewHist(algo domain.Algorithm, hRep *repository.HistoryRepository) (stmodel.Algorithm, error) {
 	proc, err := newHistoryDataProc(algo, hRep)
 	if err != nil {
 		return nil, err

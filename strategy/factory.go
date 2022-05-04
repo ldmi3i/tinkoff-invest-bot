@@ -7,12 +7,12 @@ import (
 	"invest-robot/repository"
 	"invest-robot/service"
 	"invest-robot/strategy/avr"
-	"invest-robot/strategy/model"
+	"invest-robot/strategy/stmodel"
 	"log"
 )
 
-type algProdFunc func(req domain.Algorithm, infoSrv *service.InfoSrv) (model.Algorithm, error)
-type algHistFunc func(req domain.Algorithm, rep *repository.HistoryRepository) (model.Algorithm, error)
+type algProdFunc func(req domain.Algorithm, infoSrv *service.InfoSrv) (stmodel.Algorithm, error)
+type algHistFunc func(req domain.Algorithm, rep *repository.HistoryRepository) (stmodel.Algorithm, error)
 
 //Mapping for algorithm creation strategy
 var algMapping = make(map[string]factoryStruct)
@@ -30,17 +30,17 @@ type factoryStruct struct {
 }
 
 type AlgFactory interface {
-	NewApi(alg domain.Algorithm) (model.Algorithm, error)
-	NewHist(alg domain.Algorithm) (model.Algorithm, error)
+	NewApi(alg domain.Algorithm) (stmodel.Algorithm, error)
+	NewHist(alg domain.Algorithm) (stmodel.Algorithm, error)
 }
 
 type DefaultAlgFactory struct {
 	hRep  *repository.HistoryRepository
 	iSrv  *service.InfoSrv
-	cache map[uint]*model.Algorithm
+	cache map[uint]*stmodel.Algorithm
 }
 
-func (a DefaultAlgFactory) NewApi(alg domain.Algorithm) (model.Algorithm, error) {
+func (a DefaultAlgFactory) NewApi(alg domain.Algorithm) (stmodel.Algorithm, error) {
 	log.Printf("Creating new PROD algorithm with strategy: %s and params: %+v", alg.Strategy, alg.Params)
 	factory, exist := algMapping[alg.Strategy]
 	if !exist {
@@ -52,7 +52,7 @@ func (a DefaultAlgFactory) NewApi(alg domain.Algorithm) (model.Algorithm, error)
 	return factory.algProd(alg, a.iSrv)
 }
 
-func (a DefaultAlgFactory) NewHist(alg domain.Algorithm) (model.Algorithm, error) {
+func (a DefaultAlgFactory) NewHist(alg domain.Algorithm) (stmodel.Algorithm, error) {
 	log.Printf("Creating new history algorithm with strategy: %s and params: %+v", alg.Strategy, alg.Params)
 	factory, exist := algMapping[alg.Strategy]
 	if !exist {
@@ -67,6 +67,6 @@ func NewAlgFactory(srv *service.InfoSrv, rep *repository.HistoryRepository) AlgF
 	return DefaultAlgFactory{
 		hRep:  rep,
 		iSrv:  srv,
-		cache: make(map[uint]*model.Algorithm),
+		cache: make(map[uint]*stmodel.Algorithm),
 	}
 }

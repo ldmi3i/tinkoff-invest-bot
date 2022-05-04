@@ -6,14 +6,15 @@ import (
 	"invest-robot/dto"
 	"invest-robot/errors"
 	"invest-robot/repository"
-	"invest-robot/strategy/model"
+	"invest-robot/strategy/stmodel"
+	"invest-robot/trade/trmodel"
 	"log"
 	"time"
 )
 
 type MockTrader struct {
 	hRep         repository.HistoryRepository
-	sub          *model.Subscription
+	sub          *stmodel.Subscription
 	statCh       chan dto.HistStatResponse
 	lotNums      map[string]int64        //number of lots per buy
 	figiCurrency map[string]string       //currency to instrument figi relation
@@ -26,7 +27,16 @@ type histRecord struct {
 	Price decimal.Decimal
 }
 
-func (t *MockTrader) AddSubscription(sub *model.Subscription) error {
+//auxiliary to keep trader data information
+type mockTraderData struct {
+	LastTime  time.Time
+	ResAmount map[string]decimal.Decimal
+	ResInstr  map[string]int64
+	BuyOper   uint
+	SellOper  uint
+}
+
+func (t *MockTrader) AddSubscription(sub *stmodel.Subscription) error {
 	if err := t.populateHistory(); err != nil {
 		return err
 	}
@@ -39,142 +49,115 @@ func (t *MockTrader) AddSubscription(sub *model.Subscription) error {
 }
 
 func (t *MockTrader) procBg() {
-	var buyOper uint = 0
-	var sellOper uint = 0
-	lastTime := time.Time{}
-	resAmount := make(map[string]decimal.Decimal)
-	resInstr := make(map[string]int64)
+	trDat := mockTraderData{
+		LastTime:  time.Time{},
+		ResAmount: make(map[string]decimal.Decimal),
+		ResInstr:  make(map[string]int64),
+		BuyOper:   0,
+		SellOper:  0,
+	}
 
 	for act := range t.sub.AChan {
 		action := act.Action
-		lastTime = action.RetrievedAt
+		trDat.LastTime = action.RetrievedAt
 		actCurrency, exst := t.figiCurrency[action.InstrFigi]
-		action.Currency = actCurrency
 		if !exst {
 			log.Printf("Requested unexpected figi: %s", action.InstrFigi)
-			action.Status = domain.FAILED
-			resp := model.ActionResp{
-				IsSuccess: false,
-				Action:    action,
-			}
-			t.sub.RChan <- resp
+			t.sub.RChan <- t.getRespWithStatus(&action, domain.FAILED)
 			continue
 		}
-		lim := act.GetCurrLimit(actCurrency)
-		lotNum := t.lotNums[action.InstrFigi]
-		lotPrice, err := t.calcPrice(action.InstrFigi, action.RetrievedAt)
+		opInfo := trmodel.OpInfo{Currency: actCurrency}
+		action.Currency = actCurrency
+		opInfo.Lim = act.GetCurrLimit(actCurrency)
+		opInfo.LotNum = t.lotNums[action.InstrFigi]
+		var err error
+		opInfo.LotPrice, err = t.calcPrice(action.InstrFigi, action.RetrievedAt)
 		if err != nil {
 			log.Printf("Error while calculating figi price: %s", err)
-			action.Status = domain.FAILED
-			resp := model.ActionResp{
-				IsSuccess: false,
-				Action:    action,
-			}
-			t.sub.RChan <- resp
+			t.sub.RChan <- t.getRespWithStatus(&action, domain.FAILED)
 			continue
 		}
-		if lim.IsZero() || lotNum == 0 || lotPrice.IsZero() {
+		if opInfo.Lim.IsZero() || opInfo.LotNum == 0 || opInfo.LotPrice.IsZero() {
 			log.Printf("Limit or lot price is zero; figi: %s; limit: %s; lot num: %d;lot price: %s",
-				action.InstrFigi, lim, lotNum, lotPrice)
-			action.Status = domain.FAILED
-			resp := model.ActionResp{
-				IsSuccess: false,
-				Action:    action,
-			}
-			t.sub.RChan <- resp
+				action.InstrFigi, opInfo.Lim, opInfo.LotNum, opInfo.LotPrice)
+			t.sub.RChan <- t.getRespWithStatus(&action, domain.FAILED)
 			continue
 		}
 		if action.Direction == domain.BUY {
-			onePrice := decimal.NewFromInt(lotNum).Mul(lotPrice)
-			if onePrice.GreaterThan(lim) {
-				log.Printf("Not enough money for figi %s; limit: %s; lot price: %s; one price: %s",
-					action.InstrFigi, lim, lotPrice, onePrice)
-				action.Status = domain.FAILED
-				resp := model.ActionResp{
-					IsSuccess: false,
-					Action:    action,
-				}
-				t.sub.RChan <- resp
-			}
-			operNum := lim.Div(onePrice).Floor()
-			moneyAmount := operNum.Mul(onePrice)
-			instrAmount := operNum.IntPart() * lotNum
-			resInstr[action.InstrFigi] = resInstr[action.InstrFigi] + instrAmount
-			resAmount[actCurrency] = resAmount[actCurrency].Sub(moneyAmount)
-			buyOper += 1
-			action.Status = domain.SUCCESS
-			action.Amount = moneyAmount
-			action.InstrAmount = instrAmount
-			t.sub.RChan <- model.ActionResp{
-				IsSuccess: true,
-				Action:    action,
-			}
+			t.procBuy(opInfo, &action, &trDat)
 		} else {
-			if action.InstrAmount == 0 {
-				log.Println("InstrAmount is 0 - nothing to sell")
-				action.Status = domain.FAILED
-				resp := model.ActionResp{
-					IsSuccess: false,
-					Action:    action,
-				}
-				t.sub.RChan <- resp
-			}
-			if action.InstrAmount < lotNum {
-				log.Printf("Not enough lots for one operation; requested: %d; lot num: %d", action.InstrAmount, lotNum)
-				action.Status = domain.FAILED
-				resp := model.ActionResp{
-					IsSuccess: false,
-					Action:    action,
-				}
-				t.sub.RChan <- resp
-			}
-			price, err := t.calcPrice(action.InstrFigi, action.RetrievedAt)
-			if err != nil {
-				log.Println("Can't resolve price by figi, canceling operation...")
-				action.Status = domain.FAILED
-				resp := model.ActionResp{
-					IsSuccess: false,
-					Action:    action,
-				}
-				t.sub.RChan <- resp
-			}
-			fullPart := (action.InstrAmount / lotNum) * lotNum
-			moneyAmount := price.Mul(decimal.NewFromInt(fullPart))
-			resAmount[actCurrency] = resAmount[actCurrency].Add(moneyAmount)
-			resInstr[action.InstrFigi] = resInstr[action.InstrFigi] - fullPart
-			sellOper += 1
-			action.Status = domain.SUCCESS
-			action.Currency = actCurrency
-			action.Amount = moneyAmount
-			t.sub.RChan <- model.ActionResp{
-				IsSuccess: true,
-				Action:    action,
-			}
+			t.procSell(opInfo, &action, &trDat)
 		}
 	}
 
 	log.Println("Action channel closed, stopping mock trader...")
-	stat := t.calcMoneyStat(lastTime, resAmount, resInstr)
-	stat.SellOpNum = sellOper
-	stat.BuyOpNum = buyOper
+	stat := t.calcMoneyStat(&trDat)
+	stat.SellOpNum = trDat.SellOper
+	stat.BuyOpNum = trDat.BuyOper
 	t.statCh <- stat
 }
 
-func (t MockTrader) calcMoneyStat(lastTime time.Time, resAmount map[string]decimal.Decimal, resInstr map[string]int64) dto.HistStatResponse {
+func (t *MockTrader) procBuy(opInfo trmodel.OpInfo, action *domain.Action, trDat *mockTraderData) {
+	onePrice := decimal.NewFromInt(opInfo.LotNum).Mul(opInfo.LotPrice)
+	if onePrice.GreaterThan(opInfo.Lim) {
+		log.Printf("Not enough money for figi %s; limit: %s; lot price: %s; one price: %s",
+			action.InstrFigi, opInfo.Lim, opInfo.LotPrice, onePrice)
+		t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
+	}
+	operNum := opInfo.Lim.Div(onePrice).Floor()
+	moneyAmount := operNum.Mul(onePrice)
+	instrAmount := operNum.IntPart() * opInfo.LotNum
+	trDat.ResInstr[action.InstrFigi] = trDat.ResInstr[action.InstrFigi] + instrAmount
+	trDat.ResAmount[opInfo.Currency] = trDat.ResAmount[opInfo.Currency].Sub(moneyAmount)
+	action.Amount = moneyAmount
+	action.InstrAmount = instrAmount
+	trDat.BuyOper += 1
+	t.sub.RChan <- t.getRespWithStatus(action, domain.SUCCESS)
+}
+
+func (t *MockTrader) procSell(opInfo trmodel.OpInfo, action *domain.Action, trDat *mockTraderData) {
+	if action.InstrAmount == 0 {
+		log.Println("InstrAmount is 0 - nothing to sell")
+		t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
+	}
+	if action.InstrAmount < opInfo.LotNum {
+		log.Printf("Not enough lots for one operation; requested: %d; lot num: %d", action.InstrAmount, opInfo.LotNum)
+		t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
+	}
+	price, err := t.calcPrice(action.InstrFigi, action.RetrievedAt)
+	if err != nil {
+		log.Println("Can't resolve price by figi, canceling operation...")
+		t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
+	}
+	fullPart := (action.InstrAmount / opInfo.LotNum) * opInfo.LotNum
+	moneyAmount := price.Mul(decimal.NewFromInt(fullPart))
+	trDat.ResAmount[opInfo.Currency] = trDat.ResAmount[opInfo.Currency].Add(moneyAmount)
+	trDat.ResInstr[action.InstrFigi] = trDat.ResInstr[action.InstrFigi] - fullPart
+	action.Amount = moneyAmount
+	trDat.SellOper += 1
+	t.sub.RChan <- t.getRespWithStatus(action, domain.SUCCESS)
+}
+
+func (t MockTrader) getRespWithStatus(action *domain.Action, status domain.ActionStatus) stmodel.ActionResp {
+	action.Status = status
+	return stmodel.ActionResp{Action: *action}
+}
+
+func (t MockTrader) calcMoneyStat(trDat *mockTraderData) dto.HistStatResponse {
 	//calculate money values according to current rate
-	for figi, amount := range resInstr {
+	for figi, amount := range trDat.ResInstr {
 		if amount != 0 {
-			lotPrice, err := t.calcPrice(figi, lastTime)
+			lotPrice, err := t.calcPrice(figi, trDat.LastTime)
 			if err != nil {
-				log.Printf("Error whle calculating price; figi: %s; time: %s", figi, lastTime)
+				log.Printf("Error whle calculating price; figi: %s; time: %s", figi, trDat.LastTime)
 			}
 			currency, exst := t.figiCurrency[figi]
 			if exst && err == nil {
-				resAmount[currency] = resAmount[currency].Add(lotPrice.Mul(decimal.NewFromInt(amount)))
+				trDat.ResAmount[currency] = trDat.ResAmount[currency].Add(lotPrice.Mul(decimal.NewFromInt(amount)))
 			}
 		}
 	}
-	return dto.HistStatResponse{CurBalance: resAmount}
+	return dto.HistStatResponse{CurBalance: trDat.ResAmount}
 }
 
 func (t *MockTrader) populateHistory() error {

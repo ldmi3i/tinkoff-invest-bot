@@ -1,4 +1,4 @@
-package model
+package stmodel
 
 import (
 	"github.com/shopspring/decimal"
@@ -18,7 +18,6 @@ type Algorithm interface {
 }
 
 type ActionResp struct {
-	IsSuccess   bool
 	Action      domain.Action
 	CurrAmount  decimal.Decimal
 	InstrAmount decimal.Decimal

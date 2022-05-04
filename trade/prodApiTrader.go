@@ -2,13 +2,13 @@ package trade
 
 import (
 	"invest-robot/errors"
-	"invest-robot/strategy/model"
+	"invest-robot/strategy/stmodel"
 )
 
 type ProdApiTrader struct {
 }
 
-func (at *ProdApiTrader) AddSubscription(sub *model.Subscription) error {
+func (at *ProdApiTrader) AddSubscription(sub *stmodel.Subscription) error {
 	return errors.NewNotImplemented()
 }
 
