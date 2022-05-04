@@ -8,6 +8,7 @@ import (
 	"invest-robot/strategy"
 	investapi "invest-robot/tapigen"
 	"invest-robot/trade"
+	"log"
 	"time"
 )
 
@@ -63,6 +64,10 @@ func (h DefaultHistoryAPI) AnalyzeHistory(req dto.CreateAlgorithmRequest) (*dto.
 	}
 	trDr := trade.NewMockTrader(h.histRep, lotNum, figiCurrency)
 	if err = trDr.AddSubscription(sub); err != nil {
+		return nil, err
+	}
+	if err = alg.Go(); err != nil {
+		log.Printf("Error while starting algorithm, check routine leaking")
 		return nil, err
 	}
 	res := <-trDr.GetStatCh()

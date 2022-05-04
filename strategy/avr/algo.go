@@ -57,6 +57,7 @@ func (a *AlgorithmImpl) Go() error {
 		return err
 	}
 	go a.procBg(ch)
+	(*a.dataProc).Go()
 	a.isActive = true
 	return nil
 }
@@ -66,14 +67,19 @@ func (a *AlgorithmImpl) procBg(datCh <-chan procData) {
 		a.isActive = false
 		close(a.arChan)
 		close(a.aChan)
+		log.Printf("Stopping algorithm background; ID: %d", a.id)
 	}()
 	aDat := AlgoData{
-		status: process,
-		prev:   make(map[string]decimal.Decimal),
+		status:      process,
+		prev:        make(map[string]decimal.Decimal),
+		instrAmount: make(map[string]int64),
 	}
+	log.Printf("Starting background algorithm processing; id: %d , strategy: avr , currencies: %s , limits: %s",
+		a.id, a.currencies, a.limits)
 	for {
 		select {
 		case resp, ok := <-a.arChan:
+			log.Printf("Receiving response, channel state: %t , response: %+v", ok, resp)
 			if ok {
 				err := a.processTraderResp(&aDat, &resp)
 				if err != nil {
@@ -85,10 +91,12 @@ func (a *AlgorithmImpl) procBg(datCh <-chan procData) {
 				return
 			}
 		case pDat, ok := <-datCh:
+			log.Printf("Receiving data, channel state: %t", ok)
 			if ok {
 				a.processData(&aDat, &pDat)
 			} else {
 				log.Printf("Closed data processor stream, stopping algorithm...")
+				return
 			}
 		}
 	}
@@ -98,25 +106,34 @@ func (a *AlgorithmImpl) procBg(datCh <-chan procData) {
 func (a *AlgorithmImpl) processTraderResp(aDat *AlgoData, resp *model.ActionResp) error {
 	action := resp.Action
 	if resp.IsSuccess {
-		iAmount, exists := aDat.instrAmount[action.InstrFigi]
-		if !exists {
-			aDat.instrAmount[action.InstrFigi] = iAmount
-		}
+		//iAmount, exists := aDat.instrAmount[action.InstrFigi]
+		//if !exists {
+		//	aDat.instrAmount[action.InstrFigi] = iAmount
+		//}
+		iAmount := action.InstrAmount
 		if action.Direction == domain.SELL {
 			iAmount = -iAmount
 		}
+		log.Printf("Incrementing instrument: %s with amount %d", action.InstrFigi, iAmount)
 		aDat.instrAmount[action.InstrFigi] = aDat.instrAmount[action.InstrFigi] + iAmount
 	} else {
 		log.Printf("Operation failed %+v", resp)
 	}
+	log.Printf("Trader response processed, algo data: %+v", aDat)
 	aDat.status = process
 	return nil
 }
 
 func (a *AlgorithmImpl) processData(aDat *AlgoData, pDat *procData) {
-	val, exists := aDat.prev[pDat.Figi]
-	diff := pDat.LAV.Sub(pDat.SAV)
-	if aDat.status == process && exists && val.IsNegative() && diff.IsPositive() {
+	prevDiff, exists := aDat.prev[pDat.Figi]
+	currDiff := pDat.SAV.Sub(pDat.LAV)
+	log.Printf("Difference, current: %s, prev: %s", currDiff, prevDiff)
+	aDat.prev[pDat.Figi] = currDiff
+	if aDat.status != process {
+		log.Printf("Waiting in status: %d", aDat.status)
+		return
+	}
+	if exists && prevDiff.IsNegative() && currDiff.IsPositive() {
 		action := domain.Action{
 			AlgorithmID: a.id,
 			Direction:   domain.BUY,
@@ -124,10 +141,13 @@ func (a *AlgorithmImpl) processData(aDat *AlgoData, pDat *procData) {
 			Status:      domain.CREATED,
 			RetrievedAt: pDat.Time,
 		}
+		log.Printf("Conditions for BUY, requesting action: %+v", action)
 		a.aChan <- a.makeReq(action)
 		aDat.status = waitRes
-	} else if aDat.status == process && exists && val.IsPositive() && diff.IsNegative() {
+	} else if exists && prevDiff.IsPositive() && currDiff.IsNegative() {
+
 		amount, iExists := aDat.instrAmount[pDat.Figi]
+		log.Printf("Check to sell; Instrument: %s; amount: %d", pDat.Figi, amount)
 		if iExists && amount != 0 {
 			action := domain.Action{
 				AlgorithmID: a.id,
@@ -137,10 +157,11 @@ func (a *AlgorithmImpl) processData(aDat *AlgoData, pDat *procData) {
 				Status:      domain.CREATED,
 				RetrievedAt: pDat.Time,
 			}
+			log.Printf("Conditions for SELL, requesting action: %+v", action)
 			a.aChan <- a.makeReq(action)
+			aDat.status = waitRes
 		}
 	}
-	aDat.prev[pDat.Figi] = diff
 }
 
 func (a *AlgorithmImpl) makeReq(action domain.Action) model.ActionReq {

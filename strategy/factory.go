@@ -8,6 +8,7 @@ import (
 	"invest-robot/service"
 	"invest-robot/strategy/avr"
 	"invest-robot/strategy/model"
+	"log"
 )
 
 type algProdFunc func(req domain.Algorithm, infoSrv *service.InfoSrv) (model.Algorithm, error)
@@ -40,6 +41,7 @@ type DefaultAlgFactory struct {
 }
 
 func (a DefaultAlgFactory) NewApi(alg domain.Algorithm) (model.Algorithm, error) {
+	log.Printf("Creating new PROD algorithm with strategy: %s and params: %+v", alg.Strategy, alg.Params)
 	factory, exist := algMapping[alg.Strategy]
 	if !exist {
 		return nil, errors.NewUnexpectedError(
@@ -51,6 +53,7 @@ func (a DefaultAlgFactory) NewApi(alg domain.Algorithm) (model.Algorithm, error)
 }
 
 func (a DefaultAlgFactory) NewHist(alg domain.Algorithm) (model.Algorithm, error) {
+	log.Printf("Creating new history algorithm with strategy: %s and params: %+v", alg.Strategy, alg.Params)
 	factory, exist := algMapping[alg.Strategy]
 	if !exist {
 		return nil, errors.NewUnexpectedError(

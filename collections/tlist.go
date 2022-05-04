@@ -56,7 +56,8 @@ func (t *TList[T]) removeOutOfTime() bool {
 	}
 	res := false
 	for t.last.time.Sub(t.first.time) > t.d {
-		res = res || t.removeFirst()
+		isRem := t.removeFirst()
+		res = res || isRem
 	}
 	return res
 }

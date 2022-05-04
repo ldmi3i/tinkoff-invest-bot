@@ -86,11 +86,18 @@ func (d *DbDataProc) Go() {
 
 func (d *DbDataProc) procBg() {
 	log.Printf("Start processing history data, full size: %d", len(d.hist))
-	defer close(d.dtCh)
+	defer func() {
+		close(d.dtCh)
+		log.Printf("Data processor stopped...")
+	}()
+	sOk := false
+	lOk := false
 	for _, hDat := range d.hist {
 		log.Printf("Processing data %+v", hDat)
-		sOk := d.sav.Append(hDat.Close, hDat.Time)
-		lOk := d.lav.Append(hDat.Close, hDat.Time)
+		sPop := d.sav.Append(hDat.Close, hDat.Time)
+		lPop := d.lav.Append(hDat.Close, hDat.Time)
+		sOk = sOk || sPop
+		lOk = lOk || lPop
 		if sOk && lOk {
 			sav, err := d.calcAvg(d.sav)
 			if err != nil {
@@ -105,10 +112,12 @@ func (d *DbDataProc) procBg() {
 			dat := procData{
 				Figi: hDat.Figi,
 				Time: hDat.Time,
-				LAV:  *sav,
-				SAV:  *lav,
+				LAV:  *lav,
+				SAV:  *sav,
 			}
+			log.Printf("Sending data: %+v", dat)
 			d.dtCh <- dat
+			time.Sleep(time.Millisecond)
 		}
 	}
 }
@@ -118,12 +127,12 @@ func (d *DbDataProc) calcAvg(lst collections.TList[decimal.Decimal]) (*decimal.D
 		log.Println("Requested average of empty list...")
 		return nil, errors.NewUnexpectedError("requested average calc on empty list")
 	}
-	//nd := lst.First()
 	cnt := 0
 	sum := decimal.Zero
 	for next := lst.First(); next != nil; next = next.Next() {
 		cnt += 1
 		sum = sum.Add(next.GetData())
+		//log.Printf("Calc data: %s , count: %d", next.GetData(), cnt)
 	}
 	res := sum.Div(decimal.NewFromInt(int64(cnt)))
 	return &res, nil

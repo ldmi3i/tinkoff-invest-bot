@@ -98,11 +98,13 @@ func (t *MockTrader) procBg() {
 			}
 			operNum := lim.Div(onePrice).Floor()
 			moneyAmount := operNum.Mul(onePrice)
-			resInstr[action.InstrFigi] = resInstr[action.InstrFigi] + operNum.IntPart()*lotNum
+			instrAmount := operNum.IntPart() * lotNum
+			resInstr[action.InstrFigi] = resInstr[action.InstrFigi] + instrAmount
 			resAmount[actCurrency] = resAmount[actCurrency].Sub(moneyAmount)
 			buyOper += 1
 			action.Status = domain.SUCCESS
 			action.Amount = moneyAmount
+			action.InstrAmount = instrAmount
 			t.sub.RChan <- model.ActionResp{
 				IsSuccess: true,
 				Action:    action,
@@ -141,6 +143,13 @@ func (t *MockTrader) procBg() {
 			resAmount[actCurrency] = resAmount[actCurrency].Add(moneyAmount)
 			resInstr[action.InstrFigi] = resInstr[action.InstrFigi] - fullPart
 			sellOper += 1
+			action.Status = domain.SUCCESS
+			action.Currency = actCurrency
+			action.Amount = moneyAmount
+			t.sub.RChan <- model.ActionResp{
+				IsSuccess: true,
+				Action:    action,
+			}
 		}
 	}
 
@@ -203,7 +212,9 @@ func (t MockTrader) calcPrice(figi string, tm time.Time) (decimal.Decimal, error
 	lwrVal := decimal.Zero
 	//TODO make hist sorted and use binary search
 	for _, hRec := range hist {
-		if hRec.Time.After(tm) && hRec.Time.Before(uppTm) {
+		if hRec.Time.Equal(tm) {
+			return hRec.Price, nil
+		} else if hRec.Time.After(tm) && hRec.Time.Before(uppTm) {
 			uppTm = hRec.Time
 			uppVal = hRec.Price
 		} else if hRec.Time.Before(tm) && hRec.Time.After(lwrTm) {
@@ -215,6 +226,8 @@ func (t MockTrader) calcPrice(figi string, tm time.Time) (decimal.Decimal, error
 	lwrUnx := decimal.NewFromInt(lwrTm.Unix())
 	search := decimal.NewFromInt(tm.Unix())
 	res := lwrVal.Add(uppVal.Sub(lwrVal).Mul(search.Sub(lwrUnx)).Div(uppUnx.Sub(lwrUnx)))
+	log.Printf("Interpolate between up(val,T): (%s,%s) down (%s,%s) with result (%s,%s)",
+		uppVal, uppTm, lwrVal, lwrTm, res, tm)
 	return res, nil
 }
 
@@ -227,5 +240,6 @@ func (t MockTrader) GetStatCh() chan dto.HistStatResponse {
 }
 
 func NewMockTrader(hRep repository.HistoryRepository, lotNums map[string]int64, figiCurrency map[string]string) MockTrader {
-	return MockTrader{statCh: make(chan dto.HistStatResponse), hRep: hRep}
+	log.Printf("Initializing mock trader with currencies: %+v , lot nums: %+v", lotNums, figiCurrency)
+	return MockTrader{statCh: make(chan dto.HistStatResponse), hRep: hRep, lotNums: lotNums, figiCurrency: figiCurrency}
 }
