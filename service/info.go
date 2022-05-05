@@ -10,8 +10,11 @@ import (
 
 type InfoSrv interface {
 	GetOrderBook() (*investapi.GetOrderBookResponse, error)
-	GetHistory(finis []string, ivl investapi.CandleInterval, startTime time.Time, endTime time.Time) ([]domain.History, error)
+	//GetHistorySorted return sorted by time history in time interval
+	GetHistorySorted(finis []string, ivl investapi.CandleInterval, startTime time.Time, endTime time.Time) ([]domain.History, error)
+	//GetDataStream returns bidirectional data stream client
 	GetDataStream() (investapi.MarketDataStreamService_MarketDataStreamClient, error)
+	//GetAllShares return all shares, available for operating through API
 	GetAllShares() (*investapi.SharesResponse, error)
 }
 
@@ -27,19 +30,19 @@ func (i *DefaultInfoSrv) GetOrderBook() (*investapi.GetOrderBookResponse, error)
 	return i.tapi.GetOrderBook()
 }
 
-func (i *DefaultInfoSrv) GetHistory(figis []string, ivl investapi.CandleInterval, startTime time.Time, endTime time.Time) ([]domain.History, error) {
+func (i *DefaultInfoSrv) GetHistorySorted(figis []string, ivl investapi.CandleInterval, startTime time.Time, endTime time.Time) ([]domain.History, error) {
 	next, err := nextTime(ivl, startTime)
 	if err != nil {
 		return nil, err
 	}
 	var hist []domain.History
 	if next.After(endTime) {
-		hist, err = i.tapi.GetHistory(figis, ivl, startTime, endTime)
+		hist, err = i.tapi.GetHistorySorted(figis, ivl, startTime, endTime)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		if hist, err = i.tapi.GetHistory(figis, ivl, startTime, *next); err != nil {
+		if hist, err = i.tapi.GetHistorySorted(figis, ivl, startTime, *next); err != nil {
 			return nil, err
 		}
 		curr := next
@@ -47,7 +50,7 @@ func (i *DefaultInfoSrv) GetHistory(figis []string, ivl investapi.CandleInterval
 			return nil, err
 		}
 		for next.Before(endTime) {
-			row, err := i.tapi.GetHistory(figis, ivl, *curr, *next)
+			row, err := i.tapi.GetHistorySorted(figis, ivl, *curr, *next)
 			if err != nil {
 				return nil, err
 			}
@@ -57,7 +60,7 @@ func (i *DefaultInfoSrv) GetHistory(figis []string, ivl investapi.CandleInterval
 				return nil, err
 			}
 		}
-		row, err := i.tapi.GetHistory(figis, ivl, *curr, endTime)
+		row, err := i.tapi.GetHistorySorted(figis, ivl, *curr, endTime)
 		if err != nil {
 			return nil, err
 		}

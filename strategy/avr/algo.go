@@ -176,8 +176,8 @@ func (a *AlgorithmImpl) Configure(ctx []domain.CtxParam) error {
 	return errors.NewNotImplemented()
 }
 
-func NewProd(algo *domain.Algorithm, hRep repository.HistoryRepository, infoSrv service.InfoSrv) (stmodel.Algorithm, error) {
-	proc, err := newProdDataProc(algo, hRep, infoSrv)
+func NewProd(algo *domain.Algorithm, infoSrv service.InfoSrv) (stmodel.Algorithm, error) {
+	proc, err := newProdDataProc(algo, infoSrv)
 	if err != nil {
 		return nil, err
 	}
@@ -192,8 +192,8 @@ func NewProd(algo *domain.Algorithm, hRep repository.HistoryRepository, infoSrv 
 	}, nil
 }
 
-func NewSandbox(algo *domain.Algorithm, hRep repository.HistoryRepository, infoSrv service.InfoSrv) (stmodel.Algorithm, error) {
-	proc, err := newSandboxDataProc(algo, hRep, infoSrv)
+func NewSandbox(algo *domain.Algorithm, infoSrv service.InfoSrv) (stmodel.Algorithm, error) {
+	proc, err := newSandboxDataProc(algo, infoSrv)
 	if err != nil {
 		return nil, err
 	}

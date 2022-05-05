@@ -11,8 +11,8 @@ import (
 	"log"
 )
 
-type algProdFunc func(req *domain.Algorithm, rep repository.HistoryRepository, infoSrv service.InfoSrv) (stmodel.Algorithm, error)
-type algSandboxFunc func(req *domain.Algorithm, rep repository.HistoryRepository, infoSrv service.InfoSrv) (stmodel.Algorithm, error)
+type algProdFunc func(req *domain.Algorithm, infoSrv service.InfoSrv) (stmodel.Algorithm, error)
+type algSandboxFunc func(req *domain.Algorithm, infoSrv service.InfoSrv) (stmodel.Algorithm, error)
 type algHistFunc func(req *domain.Algorithm, rep repository.HistoryRepository) (stmodel.Algorithm, error)
 
 //Mapping for algorithm creation strategy
@@ -52,7 +52,7 @@ func (a DefaultAlgFactory) NewProd(alg *domain.Algorithm) (stmodel.Algorithm, er
 			fmt.Sprintf("Algorithm '%s' does not exist - add mapping to strategy.factory.algMapping", alg.Strategy),
 		)
 	}
-	return factory.algProd(alg, a.hRep, a.iSrv)
+	return factory.algProd(alg, a.iSrv)
 }
 
 func (a DefaultAlgFactory) NewSandbox(alg *domain.Algorithm) (stmodel.Algorithm, error) {
@@ -63,7 +63,7 @@ func (a DefaultAlgFactory) NewSandbox(alg *domain.Algorithm) (stmodel.Algorithm,
 			fmt.Sprintf("Algorithm '%s' does not exist - add mapping to strategy.factory.algMapping", alg.Strategy),
 		)
 	}
-	return factory.algSandbox(alg, a.hRep, a.iSrv)
+	return factory.algSandbox(alg, a.iSrv)
 }
 
 func (a DefaultAlgFactory) NewHist(alg *domain.Algorithm) (stmodel.Algorithm, error) {

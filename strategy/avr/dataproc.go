@@ -2,6 +2,9 @@ package avr
 
 import (
 	"github.com/shopspring/decimal"
+	"invest-robot/collections"
+	"invest-robot/errors"
+	"log"
 	"time"
 )
 
@@ -22,3 +25,19 @@ const (
 	ShortDur string = "short_dur"
 	LongDur  string = "long_dur"
 )
+
+func calcAvg(lst *collections.TList[decimal.Decimal]) (*decimal.Decimal, error) {
+	if lst.IsEmpty() {
+		log.Println("Requested average of empty list...")
+		return nil, errors.NewUnexpectedError("requested average calc on empty list")
+	}
+	cnt := 0
+	sum := decimal.Zero
+	for next := lst.First(); next != nil; next = next.Next() {
+		cnt += 1
+		sum = sum.Add(next.GetData())
+		//log.Printf("Calc data: %s , count: %d", next.GetData(), cnt)
+	}
+	res := sum.Div(decimal.NewFromInt(int64(cnt)))
+	return &res, nil
+}

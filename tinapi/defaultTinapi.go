@@ -38,7 +38,7 @@ func (t DefaultTinApi) GetOrderBook() (*investapi.GetOrderBookResponse, error) {
 	return book, nil
 }
 
-func (t DefaultTinApi) GetHistory(figis []string, ivl investapi.CandleInterval, startDate time.Time, endDate time.Time) ([]domain.History, error) {
+func (t DefaultTinApi) GetHistorySorted(figis []string, ivl investapi.CandleInterval, startDate time.Time, endDate time.Time) ([]domain.History, error) {
 	var resps = make([]domain.History, 0, len(figis))
 	ctx := contextWithAuth(context.Background())
 	for _, figi := range figis {

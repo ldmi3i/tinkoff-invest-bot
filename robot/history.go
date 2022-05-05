@@ -25,7 +25,7 @@ type DefaultHistoryAPI struct {
 }
 
 func (h DefaultHistoryAPI) LoadHistory(figis []string, ivl investapi.CandleInterval, startTime time.Time, endTime time.Time) error {
-	history, err := h.infoSrv.GetHistory(figis, ivl, startTime, endTime)
+	history, err := h.infoSrv.GetHistorySorted(figis, ivl, startTime, endTime)
 	if err != nil {
 		return err
 	}

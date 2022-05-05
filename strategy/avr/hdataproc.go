@@ -60,12 +60,12 @@ func (d *DbDataProc) procBg() {
 		sOk = sOk || sPop
 		lOk = lOk || lPop
 		if sOk && lOk {
-			sav, err := d.calcAvg(d.sav)
+			sav, err := calcAvg(&d.sav)
 			if err != nil {
 				log.Printf("Error while calculating short average:\n%s", err)
 				break
 			}
-			lav, err := d.calcAvg(d.lav)
+			lav, err := calcAvg(&d.lav)
 			if err != nil {
 				log.Printf("Error while calculating long average:\n%s", err)
 				break
@@ -78,25 +78,9 @@ func (d *DbDataProc) procBg() {
 			}
 			log.Printf("Sending data: %+v", dat)
 			d.dtCh <- dat
-			time.Sleep(time.Millisecond)
+			time.Sleep(100 * time.Microsecond) //To provide time for mockTrader to finish operation
 		}
 	}
-}
-
-func (d *DbDataProc) calcAvg(lst collections.TList[decimal.Decimal]) (*decimal.Decimal, error) {
-	if lst.IsEmpty() {
-		log.Println("Requested average of empty list...")
-		return nil, errors.NewUnexpectedError("requested average calc on empty list")
-	}
-	cnt := 0
-	sum := decimal.Zero
-	for next := lst.First(); next != nil; next = next.Next() {
-		cnt += 1
-		sum = sum.Add(next.GetData())
-		//log.Printf("Calc data: %s , count: %d", next.GetData(), cnt)
-	}
-	res := sum.Div(decimal.NewFromInt(int64(cnt)))
-	return &res, nil
 }
 
 func (d *DbDataProc) Stop() error {

@@ -20,7 +20,9 @@ type DefaultTradeAPI struct {
 }
 
 func (t DefaultTradeAPI) TradeSandbox(req dto.CreateAlgorithmRequest) (*dto.TradeStartResponse, error) {
-
+	//TODO check is enough funds for any of requested figis?
+	//TODO save algorithm
+	//TODO launch algorithm with dataproc
 	return nil, errors.NewNotImplemented()
 }
 
