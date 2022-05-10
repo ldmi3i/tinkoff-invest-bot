@@ -13,18 +13,17 @@ type Algorithm interface {
 	Configure(ctx []domain.CtxParam) error
 	Subscribe() (*Subscription, error)
 	IsActive() bool
+	GetId() uint
 	Go() error
 	Stop() error
 }
 
 type ActionResp struct {
-	Action      domain.Action
-	CurrAmount  decimal.Decimal
-	InstrAmount decimal.Decimal
+	Action *domain.Action
 }
 
 type ActionReq struct {
-	Action     domain.Action
+	Action     *domain.Action
 	Currencies []string
 	Limits     []decimal.Decimal
 }
@@ -40,8 +39,8 @@ func (req ActionReq) GetCurrLimit(currency string) decimal.Decimal {
 
 type Subscription struct {
 	AlgoID uint
-	AChan  <-chan ActionReq
-	RChan  chan<- ActionResp
+	AChan  <-chan *ActionReq
+	RChan  chan<- *ActionResp
 }
 
 type TraderData struct {

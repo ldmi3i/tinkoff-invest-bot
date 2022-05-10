@@ -2,6 +2,7 @@ package service
 
 import (
 	"invest-robot/domain"
+	"invest-robot/dto/tapi"
 	"invest-robot/errors"
 	investapi "invest-robot/tapigen"
 	"invest-robot/tinapi"
@@ -16,21 +17,26 @@ type InfoSrv interface {
 	GetDataStream() (investapi.MarketDataStreamService_MarketDataStreamClient, error)
 	//GetAllShares return all shares, available for operating through API
 	GetAllShares() (*investapi.SharesResponse, error)
+	GetInstrumentInfoByFigi(figi string) (*tapi.InstrumentResponse, error)
+	GetOrderState(req *tapi.GetOrderStateRequest) (*tapi.GetOrderStateResponse, error)
+
+	GetLastPrices(figis []string) (*tapi.LastPricesResponse, error)
+	GetPositions(req *tapi.PositionsRequest) (*tapi.PositionsResponse, error)
 }
 
-type DefaultInfoSrv struct {
-	tapi tinapi.TinApi
+type BaseInfoSrv struct {
+	tapi tinapi.Api
 }
 
-func NewInfoService(t tinapi.TinApi) InfoSrv {
-	return &DefaultInfoSrv{t}
+func newBaseSrv(t tinapi.Api) *BaseInfoSrv {
+	return &BaseInfoSrv{tapi: t}
 }
 
-func (i *DefaultInfoSrv) GetOrderBook() (*investapi.GetOrderBookResponse, error) {
+func (i *BaseInfoSrv) GetOrderBook() (*investapi.GetOrderBookResponse, error) {
 	return i.tapi.GetOrderBook()
 }
 
-func (i *DefaultInfoSrv) GetHistorySorted(figis []string, ivl investapi.CandleInterval, startTime time.Time, endTime time.Time) ([]domain.History, error) {
+func (i *BaseInfoSrv) GetHistorySorted(figis []string, ivl investapi.CandleInterval, startTime time.Time, endTime time.Time) ([]domain.History, error) {
 	next, err := nextTime(ivl, startTime)
 	if err != nil {
 		return nil, err
@@ -87,10 +93,23 @@ func nextTime(ivl investapi.CandleInterval, startTime time.Time) (*time.Time, er
 	}
 }
 
-func (i *DefaultInfoSrv) GetDataStream() (investapi.MarketDataStreamService_MarketDataStreamClient, error) {
-	return i.tapi.GetDataStream()
+func (i *BaseInfoSrv) GetDataStream() (investapi.MarketDataStreamService_MarketDataStreamClient, error) {
+	return i.tapi.MarketDataStream()
 }
 
-func (i *DefaultInfoSrv) GetAllShares() (*investapi.SharesResponse, error) {
+func (i *BaseInfoSrv) GetAllShares() (*investapi.SharesResponse, error) {
 	return i.tapi.GetAllShares()
+}
+
+func (i *BaseInfoSrv) GetInstrumentInfoByFigi(figi string) (*tapi.InstrumentResponse, error) {
+	req := tapi.InstrumentRequest{
+		IdType: tapi.INSTRUMENT_ID_TYPE_FIGI,
+		Id:     figi,
+	}
+	return i.tapi.GetInstrumentInfo(&req)
+}
+
+func (i *BaseInfoSrv) GetLastPrices(figis []string) (*tapi.LastPricesResponse, error) {
+	req := tapi.LastPricesRequest{Figis: figis}
+	return i.tapi.GetLastPrices(&req)
 }

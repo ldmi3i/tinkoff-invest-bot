@@ -28,3 +28,14 @@ func NewDoubleSubErr(msg string) error {
 func NewNotImplemented() error {
 	return NewUnexpectedError("Not implemented yet!")
 }
+
+func ConvertToError(r interface{}) error {
+	switch tp := r.(type) {
+	case string:
+		return NewUnexpectedError(tp)
+	case error:
+		return tp
+	default:
+		return NewUnexpectedError("Unexpected error")
+	}
+}

@@ -3,6 +3,7 @@ package app
 import (
 	"invest-robot/helper"
 	"invest-robot/http"
+	"invest-robot/robot"
 	"log"
 )
 
@@ -23,5 +24,6 @@ func Start() {
 	//}
 	//log.Printf("Successfully retrieved book: %s", book)
 
+	robot.StartBgTasks()
 	http.StartHttp()
 }

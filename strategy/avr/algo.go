@@ -14,12 +14,17 @@ type AlgorithmImpl struct {
 	id         uint
 	isActive   bool
 	dataProc   DataProc
+	accountId  string
 	figis      []string
 	currencies []string
 	limits     []decimal.Decimal
 	param      map[string]string
-	aChan      chan stmodel.ActionReq
-	arChan     chan stmodel.ActionResp
+	aChan      chan *stmodel.ActionReq
+	arChan     chan *stmodel.ActionResp
+}
+
+func (a *AlgorithmImpl) GetId() uint {
+	return a.id
 }
 
 type algoStatus int
@@ -39,10 +44,10 @@ func (a *AlgorithmImpl) Subscribe() (*stmodel.Subscription, error) {
 	if a.aChan != nil || a.arChan != nil {
 		return nil, errors.NewDoubleSubErr("Avr algorithm multiple subscription not implemented")
 	}
-	aCh := make(chan stmodel.ActionReq, 1) //must not block algorithm, so size = 1
+	aCh := make(chan *stmodel.ActionReq, 1) //must not block algorithm, so size = 1
 	a.aChan = aCh
 
-	arCh := make(chan stmodel.ActionResp, 1) //must not block trader, so size = 1
+	arCh := make(chan *stmodel.ActionResp, 1) //must not block trader, so size = 1
 	a.arChan = arCh
 	return &stmodel.Subscription{AlgoID: a.id, AChan: a.aChan, RChan: a.arChan}, nil
 }
@@ -81,7 +86,7 @@ func (a *AlgorithmImpl) procBg(datCh <-chan procData) {
 		case resp, ok := <-a.arChan:
 			log.Printf("Receiving response, channel state: %t , response: %+v", ok, resp)
 			if ok {
-				err := a.processTraderResp(&aDat, &resp)
+				err := a.processTraderResp(&aDat, resp)
 				if err != nil {
 					log.Printf("Error while trader response processing:\n%s", err)
 					return
@@ -138,7 +143,7 @@ func (a *AlgorithmImpl) processData(aDat *AlgoData, pDat *procData) {
 			RetrievedAt: pDat.Time,
 		}
 		log.Printf("Conditions for BUY, requesting action: %+v", action)
-		a.aChan <- a.makeReq(action)
+		a.aChan <- a.makeReq(&action)
 		aDat.status = waitRes
 	} else if exists && prevDiff.IsPositive() && currDiff.IsNegative() {
 
@@ -152,16 +157,17 @@ func (a *AlgorithmImpl) processData(aDat *AlgoData, pDat *procData) {
 				InstrAmount: amount,
 				Status:      domain.CREATED,
 				RetrievedAt: pDat.Time,
+				AccountID:   a.accountId,
 			}
 			log.Printf("Conditions for SELL, requesting action: %+v", action)
-			a.aChan <- a.makeReq(action)
+			a.aChan <- a.makeReq(&action)
 			aDat.status = waitRes
 		}
 	}
 }
 
-func (a *AlgorithmImpl) makeReq(action domain.Action) stmodel.ActionReq {
-	return stmodel.ActionReq{
+func (a *AlgorithmImpl) makeReq(action *domain.Action) *stmodel.ActionReq {
+	return &stmodel.ActionReq{
 		Action:     action,
 		Currencies: a.currencies,
 		Limits:     a.limits,
@@ -184,6 +190,7 @@ func NewProd(algo *domain.Algorithm, infoSrv service.InfoSrv) (stmodel.Algorithm
 	return &AlgorithmImpl{
 		id:         algo.ID,
 		isActive:   true,
+		accountId:  algo.AccountId,
 		dataProc:   proc,
 		figis:      algo.Figis,
 		currencies: algo.Currencies,
@@ -200,6 +207,7 @@ func NewSandbox(algo *domain.Algorithm, infoSrv service.InfoSrv) (stmodel.Algori
 	return &AlgorithmImpl{
 		id:         algo.ID,
 		isActive:   true,
+		accountId:  algo.AccountId,
 		dataProc:   proc,
 		figis:      algo.Figis,
 		currencies: algo.Currencies,
@@ -216,6 +224,7 @@ func NewHist(algo *domain.Algorithm, hRep repository.HistoryRepository) (stmodel
 	return &AlgorithmImpl{
 		id:         algo.ID,
 		isActive:   true,
+		accountId:  algo.AccountId,
 		dataProc:   proc,
 		figis:      algo.Figis,
 		currencies: algo.Currencies,

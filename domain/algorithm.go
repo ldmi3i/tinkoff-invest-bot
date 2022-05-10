@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"github.com/lib/pq"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 	"invest-robot/dto"
@@ -9,8 +10,9 @@ import (
 type Algorithm struct {
 	gorm.Model
 	Strategy   string
-	Figis      []string          `gorm:"type:text[]"`
-	Currencies []string          `gorm:"type:text[]"`
+	AccountId  string
+	Figis      pq.StringArray    `gorm:"type:text[]"`
+	Currencies pq.StringArray    `gorm:"type:text[]"`
 	Limits     []decimal.Decimal `gorm:"type:numeric[]"`
 	Params     []Param
 	CtxParams  []CtxParam
@@ -49,6 +51,7 @@ func AlgorithmFromDto(req *dto.CreateAlgorithmRequest) *Algorithm {
 		Currencies: req.Currencies,
 		Limits:     req.Limits,
 		Params:     params,
+		AccountId:  req.AccountId,
 		IsActive:   true,
 	}
 }

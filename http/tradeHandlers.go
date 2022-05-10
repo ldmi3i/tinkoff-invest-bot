@@ -28,7 +28,7 @@ func (h DefaultTradeHandler) TradeSandbox(c *gin.Context) {
 		return
 	}
 	log.Printf("Analyze history: %+v", req)
-	stat, err := h.api.TradeSandbox(req)
+	stat, err := h.api.TradeSandbox(&req)
 	if err != nil {
 		log.Printf("Error while analyzing history:\n%s", err)
 		c.JSON(http.StatusInternalServerError, err.Error())

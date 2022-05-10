@@ -4,6 +4,8 @@ go 1.18
 
 require (
 	github.com/gin-gonic/gin v1.7.7
+	github.com/google/uuid v1.1.2
+	github.com/lib/pq v1.10.2
 	github.com/shopspring/decimal v1.2.0
 	github.com/stretchr/testify v1.7.0
 	google.golang.org/grpc v1.46.0

@@ -66,6 +66,7 @@ func (h DefaultHistoryAPI) AnalyzeHistory(req *dto.CreateAlgorithmRequest) (*dto
 	if err = trDr.AddSubscription(sub); err != nil {
 		return nil, err
 	}
+	trDr.Go()
 	if err = alg.Go(); err != nil {
 		log.Printf("Error while starting algorithm, check routine leaking")
 		return nil, err

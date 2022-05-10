@@ -193,5 +193,7 @@ func newSandboxDataProc(req *domain.Algorithm, infoSrv service.InfoSrv) (DataPro
 		figis:   req.Figis,
 		stopCh:  make(chan bool, 1),
 		dtCh:    make(chan procData),
+		savMap:  make(map[string]*collections.TList[decimal.Decimal]),
+		lavMap:  make(map[string]*collections.TList[decimal.Decimal]),
 	}, nil
 }

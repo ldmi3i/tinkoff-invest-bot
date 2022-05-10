@@ -36,6 +36,10 @@ type mockTraderData struct {
 	SellOper  uint
 }
 
+func (t *MockTrader) Go() {
+	go t.procBg()
+}
+
 func (t *MockTrader) AddSubscription(sub *stmodel.Subscription) error {
 	if err := t.populateHistory(); err != nil {
 		return err
@@ -44,7 +48,6 @@ func (t *MockTrader) AddSubscription(sub *stmodel.Subscription) error {
 		return errors.NewDoubleSubErr("Double subscription not available for mock trader")
 	}
 	t.sub = sub
-	go t.procBg()
 	return nil
 }
 
@@ -63,7 +66,7 @@ func (t *MockTrader) procBg() {
 		actCurrency, exst := t.figiCurrency[action.InstrFigi]
 		if !exst {
 			log.Printf("Requested unexpected figi: %s", action.InstrFigi)
-			t.sub.RChan <- t.getRespWithStatus(&action, domain.FAILED)
+			t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
 			continue
 		}
 		opInfo := trmodel.OpInfo{Currency: actCurrency}
@@ -74,19 +77,19 @@ func (t *MockTrader) procBg() {
 		opInfo.LotPrice, err = t.calcPrice(action.InstrFigi, action.RetrievedAt)
 		if err != nil {
 			log.Printf("Error while calculating figi price: %s", err)
-			t.sub.RChan <- t.getRespWithStatus(&action, domain.FAILED)
+			t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
 			continue
 		}
 		if opInfo.Lim.IsZero() || opInfo.LotNum == 0 || opInfo.LotPrice.IsZero() {
 			log.Printf("Limit or lot price is zero; figi: %s; limit: %s; lot num: %d;lot price: %s",
 				action.InstrFigi, opInfo.Lim, opInfo.LotNum, opInfo.LotPrice)
-			t.sub.RChan <- t.getRespWithStatus(&action, domain.FAILED)
+			t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
 			continue
 		}
 		if action.Direction == domain.BUY {
-			t.procBuy(opInfo, &action, &trDat)
+			t.procBuy(opInfo, action, &trDat)
 		} else {
-			t.procSell(opInfo, &action, &trDat)
+			t.procSell(opInfo, action, &trDat)
 		}
 	}
 
@@ -138,9 +141,9 @@ func (t *MockTrader) procSell(opInfo trmodel.OpInfo, action *domain.Action, trDa
 	t.sub.RChan <- t.getRespWithStatus(action, domain.SUCCESS)
 }
 
-func (t MockTrader) getRespWithStatus(action *domain.Action, status domain.ActionStatus) stmodel.ActionResp {
+func (t MockTrader) getRespWithStatus(action *domain.Action, status domain.ActionStatus) *stmodel.ActionResp {
 	action.Status = status
-	return stmodel.ActionResp{Action: *action}
+	return &stmodel.ActionResp{Action: action}
 }
 
 func (t MockTrader) calcMoneyStat(trDat *mockTraderData) dto.HistStatResponse {
