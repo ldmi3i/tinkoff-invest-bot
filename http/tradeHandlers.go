@@ -27,7 +27,7 @@ func (h DefaultTradeHandler) TradeSandbox(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, err.Error())
 		return
 	}
-	log.Printf("Analyze history: %+v", req)
+	log.Printf("Start sandbox trading: %+v", req)
 	stat, err := h.api.TradeSandbox(&req)
 	if err != nil {
 		log.Printf("Error while analyzing history:\n%s", err)

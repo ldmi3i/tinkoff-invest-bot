@@ -1,0 +1,25 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres
+    environment:
+      POSTGRES_PASSWORD: "54643243325"
+      POSTGRES_USER: "postgres"
+      POSTGRES_DB: "invest-bot"
+
+  invest-bot:
+    container_name: invest-bot
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DB_USER: "postgres"
+      DB_HOST: "postgres"
+      DB_PASSWORD: "54643243325"
+      GRPC_GO_LOG_SEVERITY_LEVEL: "info"
+      GRPC_GO_LOG_VERBOSITY_LEVEL: "99"
+      TIN_ADDRESS: "invest-public-api:tinkoff:ru:443"
+      TIN_TOKEN: "t.RpF5XdaXJIta0w9DPQ5Nn7uuIASL7ASH6C7MhYQuCutc3Fxoedc9DPFDwI4npN-WQKdSQZjOBBS27rhn9-oCzw"
+    depends_on:
+      - postgres

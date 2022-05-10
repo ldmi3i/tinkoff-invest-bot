@@ -140,6 +140,7 @@ func (a *AlgorithmImpl) processData(aDat *AlgoData, pDat *procData) {
 			InstrFigi:   pDat.Figi,
 			Status:      domain.CREATED,
 			RetrievedAt: pDat.Time,
+			AccountID:   a.accountId,
 		}
 		log.Printf("Conditions for BUY, requesting action: %+v", action)
 		a.aChan <- a.makeReq(&action)

@@ -125,7 +125,9 @@ func (t *SandboxTrader) actionProcBg() {
 			log.Println("Action bg task recovered ", pnc)
 		}
 	}()
+	log.Println("Background action listening started...")
 	for req := range t.algoCh {
+		log.Println("Received action request:", req)
 		action := req.Action
 		subscription, ok := t.subs.Get(action.AlgorithmID)
 		if !ok {
@@ -142,6 +144,7 @@ func (t *SandboxTrader) actionProcBg() {
 			t.procSell(opInfo, action, subscription)
 		}
 	}
+	log.Println("Background action listening finished...")
 }
 
 //Validate parameters and populate info context for ordering
@@ -183,7 +186,7 @@ func (t *SandboxTrader) preprocessAction(req *stmodel.ActionReq, subscription *s
 		return nil, false
 	}
 	opInfo := trmodel.OpInfo{
-		Currency: action.Currency, Lim: req.GetCurrLimit(action.InstrFigi), LotNum: instrInfo.LotNum}
+		Currency: action.Currency, Lim: req.GetCurrLimit(action.Currency), LotNum: instrInfo.LotNum}
 	if opInfo.Lim.IsZero() {
 		log.Println("Limit for currency", action.Currency, "not set, discarding order")
 		t.setActionStatus(action, domain.FAILED, "Limit by requested currency not set")
@@ -198,10 +201,12 @@ func (t *SandboxTrader) preprocessAction(req *stmodel.ActionReq, subscription *s
 		return nil, false
 	}
 	opInfo.LotPrice = prices.GetByFigi(action.InstrFigi).Price.Mul(decimal.NewFromInt(instrInfo.LotNum))
+	log.Println("Preprocess for action", action.ID, "finished")
 	return &opInfo, true
 }
 
 func (t *SandboxTrader) procBuy(opInfo *trmodel.OpInfo, action *domain.Action, sub *stmodel.Subscription) {
+	log.Println("Starting buy for action", action.ID)
 	onePrice := decimal.NewFromInt(opInfo.LotNum).Mul(opInfo.LotPrice)
 	if onePrice.GreaterThan(opInfo.Lim) {
 		log.Printf("Limit lower than minimal buy price, figi %s; limit: %s; lot price: %s; one price: %s",
@@ -242,7 +247,7 @@ func (t *SandboxTrader) procBuy(opInfo *trmodel.OpInfo, action *domain.Action, s
 	action.OrderId = orderId
 	order, err := t.tradeSrv.PostOrder(&req)
 	if err != nil {
-		log.Println("Error posting buy order", orderId)
+		log.Println("Error posting buy order", orderId, err)
 		t.setActionStatus(action, domain.FAILED, "Error while posting buy order")
 		sub.RChan <- &stmodel.ActionResp{Action: action}
 		return
@@ -317,5 +322,6 @@ func NewSandboxTrader(infoSrv service.InfoSrv, tradeSrv service.TradeService, ac
 		tradeSrv:  tradeSrv,
 		actionRep: actionRep,
 		subs:      collections.NewSyncMap[uint, *stmodel.Subscription](),
+		algoCh:    make(chan *stmodel.ActionReq, 1),
 	}
 }

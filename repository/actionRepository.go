@@ -34,7 +34,7 @@ func (rep *PgActionRepository) UpdateStatusWithMsg(id uint, status domain.Action
 			err = errors.ConvertToError(r)
 		}
 	}()
-	rep.db.Model(&domain.Action{}).Where("algorithm_id = ?", id).Updates(domain.Action{Status: status, Info: msg})
+	rep.db.Model(&domain.Action{}).Where("id = ?", id).Updates(domain.Action{Status: status, Info: msg})
 	return nil
 }
 
