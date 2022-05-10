@@ -44,8 +44,6 @@ func (t DefaultTradeAPI) TradeSandbox(req *dto.CreateAlgorithmRequest) (*dto.Tra
 		return nil, err
 	}
 	//TODO check is enough funds for any of requested figis?
-	//TODO save algorithm
-	//TODO launch algorithm with dataproc
 	return &dto.TradeStartResponse{Info: "Successfully started"}, nil
 }
 

@@ -132,56 +132,10 @@ func (t *SandboxTrader) actionProcBg() {
 			log.Printf("Error - subscription related to action not found, algo id: %d", action.AlgorithmID)
 			continue
 		}
-		err := t.actionRep.Save(action)
-		if err != nil {
-			log.Println("Error while saving action. Canceling operation...", err)
-			t.setActionStatus(action, domain.FAILED, "Error while saving action")
-			subscription.RChan <- &stmodel.ActionResp{Action: action}
+		opInfo, ok := t.preprocessAction(req, subscription)
+		if !ok {
 			continue
 		}
-		instrInfo, err := t.infoSrv.GetInstrumentInfoByFigi(action.InstrFigi)
-		if err != nil {
-			log.Println("Error while requesting instrument info. Canceling operation, updating status...", err)
-			t.setActionStatus(action, domain.FAILED, "Error getting instrument info")
-			subscription.RChan <- &stmodel.ActionResp{Action: action}
-			continue
-		}
-		action.Currency = instrInfo.Currency
-		if !instrInfo.ApiTradeAvailableFlag {
-			log.Printf("ERROR Instrument with figi %s not available for trading through API", action.InstrFigi)
-			t.setActionStatus(action, domain.FAILED, "Instrument operating through API not available")
-			subscription.RChan <- &stmodel.ActionResp{Action: action}
-			continue
-		}
-		if (!instrInfo.SellAvailableFlag && action.Direction == domain.SELL) ||
-			(!instrInfo.BuyAvailableFlag && action.Direction == domain.BUY) {
-			log.Printf("ERROR Operation by instrument not available...")
-			t.setActionStatus(action, domain.FAILED, "Operation by instrument not available")
-			subscription.RChan <- &stmodel.ActionResp{Action: action}
-			continue
-		}
-		if !instrInfo.IsTradingAvailable() {
-			log.Println("Exchange trading status has incorrect status.", instrInfo.TradingStatus)
-			t.setActionStatus(action, domain.FAILED, fmt.Sprintf("Exchange has incorrect status %d", instrInfo.TradingStatus))
-			subscription.RChan <- &stmodel.ActionResp{Action: action}
-			continue
-		}
-		opInfo := trmodel.OpInfo{
-			Currency: action.Currency, Lim: req.GetCurrLimit(action.InstrFigi), LotNum: instrInfo.LotNum}
-		if opInfo.Lim.IsZero() {
-			log.Println("Limit for currency", action.Currency, "not set, discarding order")
-			t.setActionStatus(action, domain.FAILED, "Limit by requested currency not set")
-			subscription.RChan <- &stmodel.ActionResp{Action: action}
-			continue
-		}
-		prices, err := t.infoSrv.GetLastPrices([]string{action.InstrFigi})
-		if err != nil || prices.GetByFigi(action.InstrFigi) == nil {
-			log.Println("Error retrieving last prices by ", instrInfo.TradingStatus)
-			t.setActionStatus(action, domain.FAILED, "Error getting price by figi")
-			subscription.RChan <- &stmodel.ActionResp{Action: action}
-			continue
-		}
-		opInfo.LotPrice = prices.GetByFigi(action.InstrFigi).Price.Mul(decimal.NewFromInt(instrInfo.LotNum))
 		if action.Direction == domain.BUY {
 			t.procBuy(opInfo, action, subscription)
 		} else {
@@ -190,7 +144,64 @@ func (t *SandboxTrader) actionProcBg() {
 	}
 }
 
-func (t *SandboxTrader) procBuy(opInfo trmodel.OpInfo, action *domain.Action, sub *stmodel.Subscription) {
+//Validate parameters and populate info context for ordering
+//Returns information and flag: true if validation succeed, false if validation failed and no order may be placed
+func (t *SandboxTrader) preprocessAction(req *stmodel.ActionReq, subscription *stmodel.Subscription) (*trmodel.OpInfo, bool) {
+	action := req.Action
+	err := t.actionRep.Save(action)
+	if err != nil {
+		log.Println("Error while saving action. Canceling operation...", err)
+		t.setActionStatus(action, domain.FAILED, "Error while saving action")
+		subscription.RChan <- &stmodel.ActionResp{Action: action}
+		return nil, false
+	}
+	instrInfo, err := t.infoSrv.GetInstrumentInfoByFigi(action.InstrFigi)
+	if err != nil {
+		log.Println("Error while requesting instrument info. Canceling operation, updating status...", err)
+		t.setActionStatus(action, domain.FAILED, "Error getting instrument info")
+		subscription.RChan <- &stmodel.ActionResp{Action: action}
+		return nil, false
+	}
+	action.Currency = instrInfo.Currency
+	if !instrInfo.ApiTradeAvailableFlag {
+		log.Printf("ERROR Instrument with figi %s not available for trading through API", action.InstrFigi)
+		t.setActionStatus(action, domain.FAILED, "Instrument operating through API not available")
+		subscription.RChan <- &stmodel.ActionResp{Action: action}
+		return nil, false
+	}
+	if (!instrInfo.SellAvailableFlag && action.Direction == domain.SELL) ||
+		(!instrInfo.BuyAvailableFlag && action.Direction == domain.BUY) {
+		log.Printf("ERROR Operation by instrument not available...")
+		t.setActionStatus(action, domain.FAILED, "Operation by instrument not available")
+		subscription.RChan <- &stmodel.ActionResp{Action: action}
+		return nil, false
+	}
+	if !instrInfo.IsTradingAvailable() {
+		log.Println("Exchange trading status has incorrect status.", instrInfo.TradingStatus)
+		t.setActionStatus(action, domain.FAILED, fmt.Sprintf("Exchange has incorrect status %d", instrInfo.TradingStatus))
+		subscription.RChan <- &stmodel.ActionResp{Action: action}
+		return nil, false
+	}
+	opInfo := trmodel.OpInfo{
+		Currency: action.Currency, Lim: req.GetCurrLimit(action.InstrFigi), LotNum: instrInfo.LotNum}
+	if opInfo.Lim.IsZero() {
+		log.Println("Limit for currency", action.Currency, "not set, discarding order")
+		t.setActionStatus(action, domain.FAILED, "Limit by requested currency not set")
+		subscription.RChan <- &stmodel.ActionResp{Action: action}
+		return nil, false
+	}
+	prices, err := t.infoSrv.GetLastPrices([]string{action.InstrFigi})
+	if err != nil || prices.GetByFigi(action.InstrFigi) == nil {
+		log.Println("Error retrieving last prices by ", instrInfo.TradingStatus)
+		t.setActionStatus(action, domain.FAILED, "Error getting price by figi")
+		subscription.RChan <- &stmodel.ActionResp{Action: action}
+		return nil, false
+	}
+	opInfo.LotPrice = prices.GetByFigi(action.InstrFigi).Price.Mul(decimal.NewFromInt(instrInfo.LotNum))
+	return &opInfo, true
+}
+
+func (t *SandboxTrader) procBuy(opInfo *trmodel.OpInfo, action *domain.Action, sub *stmodel.Subscription) {
 	onePrice := decimal.NewFromInt(opInfo.LotNum).Mul(opInfo.LotPrice)
 	if onePrice.GreaterThan(opInfo.Lim) {
 		log.Printf("Limit lower than minimal buy price, figi %s; limit: %s; lot price: %s; one price: %s",
@@ -244,7 +255,7 @@ func (t *SandboxTrader) procBuy(opInfo trmodel.OpInfo, action *domain.Action, su
 	sub.RChan <- &stmodel.ActionResp{Action: action}
 }
 
-func (t *SandboxTrader) procSell(opInfo trmodel.OpInfo, action *domain.Action, sub *stmodel.Subscription) {
+func (t *SandboxTrader) procSell(opInfo *trmodel.OpInfo, action *domain.Action, sub *stmodel.Subscription) {
 	if action.InstrAmount == 0 {
 		log.Println("InstrAmount is 0 - nothing to sell")
 		t.setActionStatus(action, domain.FAILED, "No instrument to sell found")

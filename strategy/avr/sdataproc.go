@@ -23,6 +23,7 @@ type SandboxDataProc struct {
 	figis   []string
 	stopCh  chan bool
 	dtCh    chan procData
+	trackId string
 
 	longDur int
 	savMap  map[string]*collections.TList[decimal.Decimal]
@@ -74,6 +75,7 @@ func (d *SandboxDataProc) procBg() {
 	for {
 		cDat, err := d.stream.Recv()
 		if err == io.EOF {
+			log.Println("Received end of stream...")
 			err := d.unsubscribe()
 			if err != nil {
 				log.Printf("Error while unsubscribing to candles, id %d: %s", d.algoId, err)
@@ -82,8 +84,10 @@ func (d *SandboxDataProc) procBg() {
 		}
 		candle := cDat.GetCandle()
 		if candle == nil {
-			trackingId := cDat.GetSubscribeCandlesResponse().GetTrackingId()
-			log.Printf("Received nil candle, id: %d, tracking id: %s, countinue...", d.algoId, trackingId)
+			if cDat.GetPing() == nil {
+				log.Printf("Received nil candle, id: %d, tracking id: %s, countinue...", d.algoId, d.trackId)
+				log.Println("Full response:", cDat)
+			}
 			continue
 		}
 		savL, ok := d.savMap[candle.Figi]
@@ -135,6 +139,7 @@ func (d *SandboxDataProc) prefetchHistory() error {
 }
 
 func (d *SandboxDataProc) subscribe() error {
+	log.Println("Subscribing to figis:", d.figis)
 	instruments := make([]*investapi.CandleInstrument, 0, len(d.figis))
 	for _, figi := range d.figis {
 		instr := investapi.CandleInstrument{
@@ -157,6 +162,13 @@ func (d *SandboxDataProc) subscribe() error {
 		log.Printf("Error while subscribing to stream: %s", err)
 		return err
 	}
+	resp, err := d.stream.Recv()
+	if err != nil {
+		log.Printf("Error while awaiting subscription response: %s", err)
+		return err
+	}
+	log.Println("Subscription response received:", resp)
+	d.trackId = resp.GetSubscribeCandlesResponse().GetTrackingId()
 	return nil
 }
 
