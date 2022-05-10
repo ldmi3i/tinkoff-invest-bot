@@ -119,7 +119,7 @@ func (d *SandboxDataProc) procBg() {
 
 func (d *SandboxDataProc) prefetchHistory() error {
 	endTime := time.Now()
-	dur := time.Duration(-d.longDur)
+	dur := time.Duration(-d.longDur) * time.Second
 	startTime := endTime.Add(dur)
 	history, err := d.infoSrv.GetHistorySorted(d.figis, investapi.CandleInterval_CANDLE_INTERVAL_1_MIN, startTime, endTime)
 	if err != nil {
