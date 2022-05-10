@@ -22,7 +22,11 @@ func (ar *PgAlgoRepository) Save(algo *domain.Algorithm) (err error) {
 			err = errors.ConvertToError(rec)
 		}
 	}()
-	ar.db.Save(algo)
+	if algo.ID == 0 {
+		ar.db.Create(algo)
+	} else {
+		ar.db.Updates(algo)
+	}
 	return nil
 }
 

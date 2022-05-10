@@ -67,7 +67,7 @@ func (d *SandboxDataProc) procBg() {
 		log.Printf("Error while prefetching history, id %d: %s", d.algoId, err)
 		return
 	}
-	if err := d.subscribe(); err != nil {
+	if err = d.subscribe(); err != nil {
 		log.Printf("Error while subsribing to candles, id %d: %s", d.algoId, err)
 		return
 	}

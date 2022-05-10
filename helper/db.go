@@ -30,6 +30,9 @@ func migrate() error {
 		&domain.History{},
 		&domain.Algorithm{},
 		&domain.Action{},
+		&domain.Param{},
+		&domain.CtxParam{},
+		&domain.MoneyLimit{},
 	)
 }
 

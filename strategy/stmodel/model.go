@@ -23,15 +23,14 @@ type ActionResp struct {
 }
 
 type ActionReq struct {
-	Action     *domain.Action
-	Currencies []string
-	Limits     []decimal.Decimal
+	Action *domain.Action
+	Limits []*domain.MoneyLimit
 }
 
 func (req ActionReq) GetCurrLimit(currency string) decimal.Decimal {
-	for i, currName := range req.Currencies {
-		if currName == currency && i < len(req.Limits) {
-			return req.Limits[i]
+	for _, limit := range req.Limits {
+		if currency == limit.Currency {
+			return limit.Amount
 		}
 	}
 	return decimal.Zero

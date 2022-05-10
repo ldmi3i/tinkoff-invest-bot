@@ -11,16 +11,15 @@ import (
 )
 
 type AlgorithmImpl struct {
-	id         uint
-	isActive   bool
-	dataProc   DataProc
-	accountId  string
-	figis      []string
-	currencies []string
-	limits     []decimal.Decimal
-	param      map[string]string
-	aChan      chan *stmodel.ActionReq
-	arChan     chan *stmodel.ActionResp
+	id        uint
+	isActive  bool
+	dataProc  DataProc
+	accountId string
+	figis     []string
+	limits    []*domain.MoneyLimit
+	param     map[string]string
+	aChan     chan *stmodel.ActionReq
+	arChan    chan *stmodel.ActionResp
 }
 
 func (a *AlgorithmImpl) GetId() uint {
@@ -79,8 +78,8 @@ func (a *AlgorithmImpl) procBg(datCh <-chan procData) {
 		prev:        make(map[string]decimal.Decimal),
 		instrAmount: make(map[string]int64),
 	}
-	log.Printf("Starting background algorithm processing; id: %d , strategy: avr , currencies: %s , limits: %s",
-		a.id, a.currencies, a.limits)
+	log.Printf("Starting background algorithm processing; id: %d , strategy: avr , limits: %+v",
+		a.id, a.limits)
 	for {
 		select {
 		case resp, ok := <-a.arChan:
@@ -168,9 +167,8 @@ func (a *AlgorithmImpl) processData(aDat *AlgoData, pDat *procData) {
 
 func (a *AlgorithmImpl) makeReq(action *domain.Action) *stmodel.ActionReq {
 	return &stmodel.ActionReq{
-		Action:     action,
-		Currencies: a.currencies,
-		Limits:     a.limits,
+		Action: action,
+		Limits: a.limits,
 	}
 }
 
@@ -188,14 +186,13 @@ func NewProd(algo *domain.Algorithm, infoSrv service.InfoSrv) (stmodel.Algorithm
 		return nil, err
 	}
 	return &AlgorithmImpl{
-		id:         algo.ID,
-		isActive:   true,
-		accountId:  algo.AccountId,
-		dataProc:   proc,
-		figis:      algo.Figis,
-		currencies: algo.Currencies,
-		limits:     algo.Limits,
-		param:      domain.ParamsToMap(algo.Params),
+		id:        algo.ID,
+		isActive:  true,
+		accountId: algo.AccountId,
+		dataProc:  proc,
+		figis:     algo.Figis,
+		limits:    algo.MoneyLimits,
+		param:     domain.ParamsToMap(algo.Params),
 	}, nil
 }
 
@@ -205,14 +202,13 @@ func NewSandbox(algo *domain.Algorithm, infoSrv service.InfoSrv) (stmodel.Algori
 		return nil, err
 	}
 	return &AlgorithmImpl{
-		id:         algo.ID,
-		isActive:   true,
-		accountId:  algo.AccountId,
-		dataProc:   proc,
-		figis:      algo.Figis,
-		currencies: algo.Currencies,
-		limits:     algo.Limits,
-		param:      domain.ParamsToMap(algo.Params),
+		id:        algo.ID,
+		isActive:  true,
+		accountId: algo.AccountId,
+		dataProc:  proc,
+		figis:     algo.Figis,
+		limits:    algo.MoneyLimits,
+		param:     domain.ParamsToMap(algo.Params),
 	}, nil
 }
 
@@ -222,13 +218,12 @@ func NewHist(algo *domain.Algorithm, hRep repository.HistoryRepository) (stmodel
 		return nil, err
 	}
 	return &AlgorithmImpl{
-		id:         algo.ID,
-		isActive:   true,
-		accountId:  algo.AccountId,
-		dataProc:   proc,
-		figis:      algo.Figis,
-		currencies: algo.Currencies,
-		limits:     algo.Limits,
-		param:      domain.ParamsToMap(algo.Params),
+		id:        algo.ID,
+		isActive:  true,
+		accountId: algo.AccountId,
+		dataProc:  proc,
+		figis:     algo.Figis,
+		limits:    algo.MoneyLimits,
+		param:     domain.ParamsToMap(algo.Params),
 	}, nil
 }
