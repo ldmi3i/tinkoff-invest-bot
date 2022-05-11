@@ -41,7 +41,7 @@ type InstrumentResponse struct {
 	Ticker    string
 	ClassCode string
 	Isin      string
-	LotNum    int64
+	Lot       int64
 	Currency  string
 
 	KLong            decimal.Decimal
@@ -82,7 +82,7 @@ func InstrumentResponseToDto(res *investapi.InstrumentResponse) *InstrumentRespo
 		Ticker:                instr.Ticker,
 		ClassCode:             instr.ClassCode,
 		Isin:                  instr.Isin,
-		LotNum:                int64(instr.Lot),
+		Lot:                   int64(instr.Lot),
 		Currency:              instr.Currency,
 		KLong:                 convert.QuotationToDec(instr.Klong),
 		KShort:                convert.QuotationToDec(instr.Kshort),

@@ -192,7 +192,7 @@ func (t *SandboxTrader) preprocessAction(req *stmodel.ActionReq, subscription *s
 		return nil, false
 	}
 	opInfo := trmodel.OpInfo{
-		Currency: action.Currency, Lim: req.GetCurrLimit(action.Currency), LotNum: instrInfo.LotNum}
+		Currency: action.Currency, Lim: req.GetCurrLimit(action.Currency), PosNum: instrInfo.Lot}
 	if opInfo.Lim.IsZero() {
 		log.Println("Limit for currency", action.Currency, "not set, discarding order")
 		t.setActionStatus(action, domain.FAILED, "Limit by requested currency not set")
@@ -216,21 +216,21 @@ func (t *SandboxTrader) preprocessAction(req *stmodel.ActionReq, subscription *s
 func (t *SandboxTrader) procBuy(opInfo *trmodel.OpInfo, action *domain.Action, sub *stmodel.Subscription) {
 	log.Println("Starting buy for action", action.ID)
 	//Calculating price for single buy operation multiple to instrument weight
-	onePrice := decimal.NewFromInt(opInfo.LotNum).Mul(opInfo.LotPrice)
+	lotPrice := decimal.NewFromInt(opInfo.PosNum).Mul(opInfo.LotPrice)
 	//Check is minimum instrument price exceed the limit
-	if onePrice.GreaterThan(opInfo.Lim) {
+	if lotPrice.GreaterThan(opInfo.Lim) {
 		log.Printf("Limit lower than minimal buy price, figi %s; limit: %s; lot price: %s; one price: %s",
-			action.InstrFigi, opInfo.Lim, opInfo.LotPrice, onePrice)
+			action.InstrFigi, opInfo.Lim, opInfo.LotPrice, lotPrice)
 		t.setActionStatus(action, domain.FAILED, "Price of one buy exceeds limit")
 		sub.RChan <- &stmodel.ActionResp{Action: action}
 		return
 	}
 	//Calculate number of weighted instruments possible to buy for existing limit
-	operNum := opInfo.Lim.Div(onePrice).Floor()
+	operNum := opInfo.Lim.Div(lotPrice).Floor()
 	//Calculate required amount of money for this order
-	moneyAmount := operNum.Mul(onePrice)
+	moneyAmount := operNum.Mul(lotPrice)
 	//Calculate instrument amount to buy
-	instrAmount := operNum.IntPart() * opInfo.LotNum
+	lotAmount := operNum.IntPart()
 	//Get real available money amount using GetPositions request
 	posReq := tapi.PositionsRequest{AccountId: action.AccountID}
 	positions, err := t.infoSrv.GetPositions(&posReq)
@@ -244,7 +244,7 @@ func (t *SandboxTrader) procBuy(opInfo *trmodel.OpInfo, action *domain.Action, s
 	//Check is account has available amount of money for operation
 	if moneyAvail == nil || moneyAvail.Value.LessThan(moneyAmount) {
 		log.Printf("Not enough money for figi %s;  lot price: %s; lot num: %d; required money: %s; available money: %s",
-			action.InstrFigi, opInfo.LotPrice, opInfo.LotNum, moneyAmount, moneyAvail)
+			action.InstrFigi, opInfo.LotPrice, opInfo.PosNum, moneyAmount, moneyAvail)
 		t.setActionStatus(action, domain.FAILED, fmt.Sprintf("No money for operation"))
 		sub.RChan <- &stmodel.ActionResp{Action: action}
 		return
@@ -252,9 +252,8 @@ func (t *SandboxTrader) procBuy(opInfo *trmodel.OpInfo, action *domain.Action, s
 	//Prepare request (currently only Market order type) and post order
 	orderId := uuid.New().String()
 	req := tapi.PostOrderRequest{
-		Figi:   action.InstrFigi,
-		LotNum: instrAmount,
-		//InstrPrice: opInfo.LotPrice,
+		Figi:      action.InstrFigi,
+		PosNum:    lotAmount,
 		Direction: tapi.ORDER_DIRECTION_BUY,
 		AccountId: action.AccountID,
 		OrderType: tapi.ORDER_TYPE_MARKET,
@@ -271,7 +270,7 @@ func (t *SandboxTrader) procBuy(opInfo *trmodel.OpInfo, action *domain.Action, s
 	log.Printf("Posted buy order: %+v", order)
 	//Set amounts of money to action and update action status in db
 	action.Amount = moneyAmount
-	action.InstrAmount = instrAmount
+	action.InstrAmount = lotAmount
 	t.orders.Put(order.OrderId, action)
 	t.setActionStatus(action, domain.POSTED, "Action posted successfully")
 }
@@ -286,8 +285,8 @@ func (t *SandboxTrader) procSell(opInfo *trmodel.OpInfo, action *domain.Action, 
 		return
 	}
 	//Check is requested instrument amount not lower than instrument lot weight
-	if action.InstrAmount < opInfo.LotNum {
-		log.Printf("Not enough lots for one operation; requested: %d; lot num: %d", action.InstrAmount, opInfo.LotNum)
+	if action.InstrAmount < opInfo.PosNum {
+		log.Printf("Not enough lots for one operation; requested: %d; lot num: %d", action.InstrAmount, opInfo.PosNum)
 		t.setActionStatus(action, domain.FAILED, "Not enough instrument for sell")
 		sub.RChan <- &stmodel.ActionResp{Action: action}
 		return
@@ -295,13 +294,12 @@ func (t *SandboxTrader) procSell(opInfo *trmodel.OpInfo, action *domain.Action, 
 	//Posting market sell request
 	orderId := uuid.New().String()
 	req := tapi.PostOrderRequest{
-		Figi:       action.InstrFigi,
-		LotNum:     action.InstrAmount,
-		InstrPrice: opInfo.LotPrice,
-		Direction:  tapi.ORDER_DIRECTION_SELL,
-		AccountId:  action.AccountID,
-		OrderType:  tapi.ORDER_TYPE_MARKET,
-		OrderId:    orderId,
+		Figi:      action.InstrFigi,
+		PosNum:    action.InstrAmount,
+		Direction: tapi.ORDER_DIRECTION_SELL,
+		AccountId: action.AccountID,
+		OrderType: tapi.ORDER_TYPE_MARKET,
+		OrderId:   orderId,
 	}
 	action.OrderId = orderId
 	order, err := t.tradeSrv.PostOrder(&req)

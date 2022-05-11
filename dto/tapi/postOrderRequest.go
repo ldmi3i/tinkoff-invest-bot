@@ -23,7 +23,7 @@ const (
 
 type PostOrderRequest struct {
 	Figi       string
-	LotNum     int64
+	PosNum     int64
 	InstrPrice decimal.Decimal
 	Direction  OrderDirection
 	AccountId  string
@@ -37,7 +37,7 @@ func (pr *PostOrderRequest) ToTinApi() *investapi.PostOrderRequest {
 	}
 	return &investapi.PostOrderRequest{
 		Figi:      pr.Figi,
-		Quantity:  pr.LotNum,
+		Quantity:  pr.PosNum,
 		Price:     convert.DecToQuotation(pr.InstrPrice),
 		Direction: investapi.OrderDirection(pr.Direction),
 		AccountId: pr.AccountId,
