@@ -41,6 +41,7 @@ func (t *SandboxTrader) AddSubscription(sub *stmodel.Subscription) error {
 //Background task to process subscriptions and redirect all of them to single stream
 func (t *SandboxTrader) subBg(sub *stmodel.Subscription) {
 	log.Printf("Starting background processing for algo with id: %d", sub.AlgoID)
+	//TODO Add stop channel and select
 	for req := range sub.AChan {
 		log.Printf("Received algo request: %+v", req)
 		t.algoCh <- req
@@ -61,9 +62,10 @@ func (t *SandboxTrader) checkOrdersBg() {
 			}
 			state, err := t.infoSrv.GetOrderState(&req)
 			if err != nil {
-				log.Println("Error checking order state", req)
+				log.Println("Error checking order state", req, err)
 				continue
 			}
+			log.Println("Check order with id", entry.Key, "status", state.ExecStatus)
 			switch state.ExecStatus {
 			case tapi.EXECUTION_REPORT_STATUS_FILL:
 				action.Status = domain.SUCCESS
@@ -72,11 +74,11 @@ func (t *SandboxTrader) checkOrdersBg() {
 				action.Currency = state.TotalPrice.Currency
 				err = t.actionRep.Save(action)
 				if err != nil {
-					log.Println("Error while updating action", action)
+					log.Println("Error while updating action", action, err)
 				}
 				t.orders.Delete(entry.Key)
 				log.Println("Order with id", entry.Key, "completed")
-				sub, ok := t.subs.Get(action.ID)
+				sub, ok := t.subs.Get(action.AlgorithmID)
 				if !ok {
 					log.Println("Subscription by id", action.ID, "not found")
 					continue
@@ -87,7 +89,7 @@ func (t *SandboxTrader) checkOrdersBg() {
 				action.Info = "Order was rejected"
 				err = t.actionRep.Save(action)
 				if err != nil {
-					log.Println("Error while updating action", action)
+					log.Println("Error while updating action", action, err)
 				}
 				t.orders.Delete(entry.Key)
 				log.Println("Order with id", entry.Key, "rejected")
@@ -102,7 +104,7 @@ func (t *SandboxTrader) checkOrdersBg() {
 				action.Info = "Order was canceled"
 				err = t.actionRep.Save(action)
 				if err != nil {
-					log.Println("Error while updating action", action)
+					log.Println("Error while updating action", action, err)
 				}
 				t.orders.Delete(entry.Key)
 				log.Println("Order with id", entry.Key, "rejected")
@@ -114,7 +116,7 @@ func (t *SandboxTrader) checkOrdersBg() {
 				sub.RChan <- &stmodel.ActionResp{Action: action}
 			}
 		}
-		time.Sleep(time.Minute)
+		time.Sleep(30 * time.Second)
 	}
 }
 
@@ -158,6 +160,7 @@ func (t *SandboxTrader) preprocessAction(req *stmodel.ActionReq, subscription *s
 		subscription.RChan <- &stmodel.ActionResp{Action: action}
 		return nil, false
 	}
+	//Retrieving instrument for order
 	instrInfo, err := t.infoSrv.GetInstrumentInfoByFigi(action.InstrFigi)
 	if err != nil {
 		log.Println("Error while requesting instrument info. Canceling operation, updating status...", err)
@@ -166,12 +169,14 @@ func (t *SandboxTrader) preprocessAction(req *stmodel.ActionReq, subscription *s
 		return nil, false
 	}
 	action.Currency = instrInfo.Currency
+	//Check api available flag
 	if !instrInfo.ApiTradeAvailableFlag {
 		log.Printf("ERROR Instrument with figi %s not available for trading through API", action.InstrFigi)
 		t.setActionStatus(action, domain.FAILED, "Instrument operating through API not available")
 		subscription.RChan <- &stmodel.ActionResp{Action: action}
 		return nil, false
 	}
+	//Check is specific operation available for instrument
 	if (!instrInfo.SellAvailableFlag && action.Direction == domain.SELL) ||
 		(!instrInfo.BuyAvailableFlag && action.Direction == domain.BUY) {
 		log.Printf("ERROR Operation by instrument not available...")
@@ -179,6 +184,7 @@ func (t *SandboxTrader) preprocessAction(req *stmodel.ActionReq, subscription *s
 		subscription.RChan <- &stmodel.ActionResp{Action: action}
 		return nil, false
 	}
+	//Check is trade session has ok status
 	if !instrInfo.IsTradingAvailable() {
 		log.Println("Exchange trading status has incorrect status.", instrInfo.TradingStatus)
 		t.setActionStatus(action, domain.FAILED, fmt.Sprintf("Exchange has incorrect status %d", instrInfo.TradingStatus))
@@ -193,6 +199,7 @@ func (t *SandboxTrader) preprocessAction(req *stmodel.ActionReq, subscription *s
 		subscription.RChan <- &stmodel.ActionResp{Action: action}
 		return nil, false
 	}
+	//Retrieve last single lot price
 	prices, err := t.infoSrv.GetLastPrices([]string{action.InstrFigi})
 	if err != nil || prices.GetByFigi(action.InstrFigi) == nil {
 		log.Println("Error retrieving last prices by ", instrInfo.TradingStatus)
@@ -200,14 +207,17 @@ func (t *SandboxTrader) preprocessAction(req *stmodel.ActionReq, subscription *s
 		subscription.RChan <- &stmodel.ActionResp{Action: action}
 		return nil, false
 	}
-	opInfo.LotPrice = prices.GetByFigi(action.InstrFigi).Price.Mul(decimal.NewFromInt(instrInfo.LotNum))
+	opInfo.LotPrice = prices.GetByFigi(action.InstrFigi).Price
 	log.Println("Preprocess for action", action.ID, "finished")
 	return &opInfo, true
 }
 
+//Process buy order
 func (t *SandboxTrader) procBuy(opInfo *trmodel.OpInfo, action *domain.Action, sub *stmodel.Subscription) {
 	log.Println("Starting buy for action", action.ID)
+	//Calculating price for single buy operation multiple to instrument weight
 	onePrice := decimal.NewFromInt(opInfo.LotNum).Mul(opInfo.LotPrice)
+	//Check is minimum instrument price exceed the limit
 	if onePrice.GreaterThan(opInfo.Lim) {
 		log.Printf("Limit lower than minimal buy price, figi %s; limit: %s; lot price: %s; one price: %s",
 			action.InstrFigi, opInfo.Lim, opInfo.LotPrice, onePrice)
@@ -215,9 +225,13 @@ func (t *SandboxTrader) procBuy(opInfo *trmodel.OpInfo, action *domain.Action, s
 		sub.RChan <- &stmodel.ActionResp{Action: action}
 		return
 	}
+	//Calculate number of weighted instruments possible to buy for existing limit
 	operNum := opInfo.Lim.Div(onePrice).Floor()
+	//Calculate required amount of money for this order
 	moneyAmount := operNum.Mul(onePrice)
+	//Calculate instrument amount to buy
 	instrAmount := operNum.IntPart() * opInfo.LotNum
+	//Get real available money amount using GetPositions request
 	posReq := tapi.PositionsRequest{AccountId: action.AccountID}
 	positions, err := t.infoSrv.GetPositions(&posReq)
 	if err != nil {
@@ -227,22 +241,24 @@ func (t *SandboxTrader) procBuy(opInfo *trmodel.OpInfo, action *domain.Action, s
 		return
 	}
 	moneyAvail := positions.GetMoney(action.Currency)
+	//Check is account has available amount of money for operation
 	if moneyAvail == nil || moneyAvail.Value.LessThan(moneyAmount) {
-		log.Printf("Not enough money for figi %s; limit: %s; lot price: %s; one price: %s",
-			action.InstrFigi, opInfo.Lim, opInfo.LotPrice, onePrice)
+		log.Printf("Not enough money for figi %s;  lot price: %s; lot num: %d; required money: %s; available money: %s",
+			action.InstrFigi, opInfo.LotPrice, opInfo.LotNum, moneyAmount, moneyAvail)
 		t.setActionStatus(action, domain.FAILED, fmt.Sprintf("No money for operation"))
 		sub.RChan <- &stmodel.ActionResp{Action: action}
 		return
 	}
+	//Prepare request (currently only Market order type) and post order
 	orderId := uuid.New().String()
 	req := tapi.PostOrderRequest{
-		Figi:       action.InstrFigi,
-		LotNum:     instrAmount,
-		InstrPrice: opInfo.LotPrice,
-		Direction:  tapi.ORDER_DIRECTION_BUY,
-		AccountId:  action.AccountID,
-		OrderType:  tapi.ORDER_TYPE_MARKET,
-		OrderId:    orderId,
+		Figi:   action.InstrFigi,
+		LotNum: instrAmount,
+		//InstrPrice: opInfo.LotPrice,
+		Direction: tapi.ORDER_DIRECTION_BUY,
+		AccountId: action.AccountID,
+		OrderType: tapi.ORDER_TYPE_MARKET,
+		OrderId:   orderId,
 	}
 	action.OrderId = orderId
 	order, err := t.tradeSrv.PostOrder(&req)
@@ -253,26 +269,30 @@ func (t *SandboxTrader) procBuy(opInfo *trmodel.OpInfo, action *domain.Action, s
 		return
 	}
 	log.Printf("Posted buy order: %+v", order)
+	//Set amounts of money to action and update action status in db
 	action.Amount = moneyAmount
 	action.InstrAmount = instrAmount
-	t.orders.Put(orderId, action)
+	t.orders.Put(order.OrderId, action)
 	t.setActionStatus(action, domain.POSTED, "Action posted successfully")
-	sub.RChan <- &stmodel.ActionResp{Action: action}
 }
 
+//Process sell order (currently there's no limits for a sell operation)
 func (t *SandboxTrader) procSell(opInfo *trmodel.OpInfo, action *domain.Action, sub *stmodel.Subscription) {
+	//Check is requested instrument amount for a sell not zero
 	if action.InstrAmount == 0 {
 		log.Println("InstrAmount is 0 - nothing to sell")
 		t.setActionStatus(action, domain.FAILED, "No instrument to sell found")
 		sub.RChan <- &stmodel.ActionResp{Action: action}
 		return
 	}
+	//Check is requested instrument amount not lower than instrument lot weight
 	if action.InstrAmount < opInfo.LotNum {
 		log.Printf("Not enough lots for one operation; requested: %d; lot num: %d", action.InstrAmount, opInfo.LotNum)
 		t.setActionStatus(action, domain.FAILED, "Not enough instrument for sell")
 		sub.RChan <- &stmodel.ActionResp{Action: action}
 		return
 	}
+	//Posting market sell request
 	orderId := uuid.New().String()
 	req := tapi.PostOrderRequest{
 		Figi:       action.InstrFigi,
@@ -291,12 +311,13 @@ func (t *SandboxTrader) procSell(opInfo *trmodel.OpInfo, action *domain.Action, 
 		sub.RChan <- &stmodel.ActionResp{Action: action}
 		return
 	}
-	t.orders.Put(orderId, action)
+	//Populating orders map to further state monitoring and responding
+	t.orders.Put(order.OrderId, action)
 	log.Println("Posted sell order", order)
 	t.setActionStatus(action, domain.POSTED, "Sell order successfully posted")
-	sub.RChan <- &stmodel.ActionResp{Action: action}
 }
 
+//Set status and info message to action and updates it in db
 func (t *SandboxTrader) setActionStatus(action *domain.Action, status domain.ActionStatus, msg string) {
 	action.Status = status
 	if err := t.actionRep.UpdateStatusWithMsg(action.ID, action.Status, msg); err != nil {
@@ -304,6 +325,7 @@ func (t *SandboxTrader) setActionStatus(action *domain.Action, status domain.Act
 	}
 }
 
+// RemoveSubscription removes algorithm subscription and stop monitoring
 func (t *SandboxTrader) RemoveSubscription(id uint) error {
 	log.Printf("Remove subscription for algo with id: %d", id)
 	sub, ok := t.subs.Get(id)
@@ -322,6 +344,7 @@ func NewSandboxTrader(infoSrv service.InfoSrv, tradeSrv service.TradeService, ac
 		tradeSrv:  tradeSrv,
 		actionRep: actionRep,
 		subs:      collections.NewSyncMap[uint, *stmodel.Subscription](),
+		orders:    collections.NewSyncMap[string, *domain.Action](),
 		algoCh:    make(chan *stmodel.ActionReq, 1),
 	}
 }

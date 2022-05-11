@@ -56,7 +56,7 @@ func (a DefaultAlgFactory) NewProd(alg *domain.Algorithm) (stmodel.Algorithm, er
 }
 
 func (a DefaultAlgFactory) NewSandbox(alg *domain.Algorithm) (stmodel.Algorithm, error) {
-	log.Printf("Creating new PROD algorithm with strategy: %s and params: %+v", alg.Strategy, alg.Params)
+	log.Printf("Creating new SANDBOX algorithm with strategy: %s and params: %+v", alg.Strategy, alg.Params)
 	factory, exist := algMapping[alg.Strategy]
 	if !exist {
 		return nil, errors.NewUnexpectedError(

@@ -23,6 +23,9 @@ type MoneyValue struct {
 }
 
 func MoneyValueToDto(q *investapi.MoneyValue) *MoneyValue {
+	if q == nil {
+		return nil
+	}
 	return &MoneyValue{
 		Currency: q.Currency,
 		Value:    convert.TinToDec(q.Units, q.Nano),

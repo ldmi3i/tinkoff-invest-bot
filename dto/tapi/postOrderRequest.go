@@ -13,7 +13,9 @@ const (
 	ORDER_DIRECTION_UNSPECIFIED OrderDirection = iota
 	ORDER_DIRECTION_BUY
 	ORDER_DIRECTION_SELL
+)
 
+const (
 	ORDER_TYPE_UNSPECIFIED OrderType = iota
 	ORDER_TYPE_LIMIT
 	ORDER_TYPE_MARKET
@@ -30,6 +32,9 @@ type PostOrderRequest struct {
 }
 
 func (pr *PostOrderRequest) ToTinApi() *investapi.PostOrderRequest {
+	if pr == nil {
+		return nil
+	}
 	return &investapi.PostOrderRequest{
 		Figi:      pr.Figi,
 		Quantity:  pr.LotNum,

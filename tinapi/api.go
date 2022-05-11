@@ -8,6 +8,7 @@ import (
 	"invest-robot/dto/tapi"
 	"invest-robot/helper"
 	investapi "invest-robot/tapigen"
+	"log"
 	"time"
 )
 
@@ -138,6 +139,7 @@ func (t *DefaultTinApi) GetLastPrices(req *tapi.LastPricesRequest) (*tapi.LastPr
 
 func (t *DefaultTinApi) PostSandboxOrder(req *tapi.PostOrderRequest) (*tapi.PostOrderResponse, error) {
 	ctx := contextWithAuth(context.Background())
+	log.Println("Post order request:", req.ToTinApi())
 	order, err := t.sandboxCl.PostSandboxOrder(ctx, req.ToTinApi())
 	if err != nil {
 		return nil, err

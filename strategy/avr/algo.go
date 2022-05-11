@@ -83,7 +83,7 @@ func (a *AlgorithmImpl) procBg(datCh <-chan procData) {
 	for {
 		select {
 		case resp, ok := <-a.arChan:
-			log.Printf("Receiving response, channel state: %t , response: %+v", ok, resp)
+			log.Printf("Receiving response, channel state: %t , response: %+v", ok, *resp)
 			if ok {
 				err := a.processTraderResp(&aDat, resp)
 				if err != nil {

@@ -14,7 +14,9 @@ const (
 	CANCELED ActionStatus = "CANCELED"
 	SUCCESS  ActionStatus = "SUCCESS"
 	FAILED   ActionStatus = "FAILED"
+)
 
+const (
 	BUY ActionDirection = iota
 	SELL
 )
