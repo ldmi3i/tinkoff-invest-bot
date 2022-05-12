@@ -209,7 +209,7 @@ func (t *SandboxTrader) preprocessAction(req *stmodel.ActionReq, subscription *s
 		subscription.RChan <- &stmodel.ActionResp{Action: action}
 		return nil, false
 	}
-	opInfo.LotPrice = prices.GetByFigi(action.InstrFigi).Price
+	opInfo.PosPrice = prices.GetByFigi(action.InstrFigi).Price
 	t.logger.Debugf("Preprocess for action %d finished", action.ID)
 	return &opInfo, true
 }
@@ -218,11 +218,11 @@ func (t *SandboxTrader) preprocessAction(req *stmodel.ActionReq, subscription *s
 func (t *SandboxTrader) procBuy(opInfo *trmodel.OpInfo, action *domain.Action, sub *stmodel.Subscription) {
 	t.logger.Debug("Starting buy for action ", action.ID)
 	//Calculating price for single buy operation multiple to instrument weight
-	lotPrice := decimal.NewFromInt(opInfo.PosNum).Mul(opInfo.LotPrice)
+	lotPrice := decimal.NewFromInt(opInfo.PosNum).Mul(opInfo.PosPrice)
 	//Check is minimum instrument price exceed the limit
 	if lotPrice.GreaterThan(opInfo.Lim) {
 		t.logger.Warnf("Limit lower than minimal buy price, figi %s; limit: %s; lot price: %s; one price: %s",
-			action.InstrFigi, opInfo.Lim, opInfo.LotPrice, lotPrice)
+			action.InstrFigi, opInfo.Lim, opInfo.PosPrice, lotPrice)
 		t.setActionStatus(action, domain.FAILED, "Price of one buy exceeds limit")
 		sub.RChan <- &stmodel.ActionResp{Action: action}
 		return
@@ -246,7 +246,7 @@ func (t *SandboxTrader) procBuy(opInfo *trmodel.OpInfo, action *domain.Action, s
 	//Check is account has available amount of money for operation
 	if moneyAvail == nil || moneyAvail.Value.LessThan(moneyAmount) {
 		t.logger.Warnf("Not enough money for figi %s;  lot price: %s; lot num: %d; required money: %s; available money: %s",
-			action.InstrFigi, opInfo.LotPrice, opInfo.PosNum, moneyAmount, moneyAvail)
+			action.InstrFigi, opInfo.PosPrice, opInfo.PosNum, moneyAmount, moneyAvail)
 		t.setActionStatus(action, domain.FAILED, fmt.Sprintf("No money for operation"))
 		sub.RChan <- &stmodel.ActionResp{Action: action}
 		return
@@ -283,13 +283,6 @@ func (t *SandboxTrader) procSell(opInfo *trmodel.OpInfo, action *domain.Action, 
 	if action.LotAmount == 0 {
 		t.logger.Warn("LotAmount is 0 - nothing to sell")
 		t.setActionStatus(action, domain.FAILED, "No instrument to sell found")
-		sub.RChan <- &stmodel.ActionResp{Action: action}
-		return
-	}
-	//Check is requested instrument amount not lower than instrument lot weight
-	if action.LotAmount < opInfo.PosNum {
-		t.logger.Warnf("Not enough lots for one operation; requested: %d; lot num: %d", action.LotAmount, opInfo.PosNum)
-		t.setActionStatus(action, domain.FAILED, "Not enough instrument for sell")
 		sub.RChan <- &stmodel.ActionResp{Action: action}
 		return
 	}

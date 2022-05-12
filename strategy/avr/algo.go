@@ -128,7 +128,8 @@ func (a *AlgorithmImpl) processTraderResp(aDat *AlgoData, resp *stmodel.ActionRe
 			//Checks and update previous buy limit to wait for next sell price no lower than buy price
 			price, ok := a.buyPrice[action.InstrFigi]
 			if ok {
-				a.buyPrice[action.InstrFigi] = decimal.Min(price, action.PositionPrice)
+				//If it's consecutive buy then select maximum price
+				a.buyPrice[action.InstrFigi] = decimal.Max(price, action.PositionPrice)
 			} else {
 				a.buyPrice[action.InstrFigi] = action.PositionPrice
 			}
@@ -153,6 +154,11 @@ func (a *AlgorithmImpl) processData(aDat *AlgoData, pDat *procData) {
 		return
 	}
 	if exists && prevDiff.IsNegative() && currDiff.IsPositive() {
+		price, ok := a.buyPrice[pDat.Figi]
+		if ok {
+			a.logger.Info("Previous buy operation not finished with price: ", price, "; waiting for sell operation...")
+			return
+		}
 		action := domain.Action{
 			AlgorithmID: a.id,
 			Direction:   domain.BUY,

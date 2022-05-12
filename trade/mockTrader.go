@@ -16,7 +16,7 @@ type MockTrader struct {
 	hRep         repository.HistoryRepository
 	sub          *stmodel.Subscription
 	statCh       chan dto.HistStatResponse
-	logs         map[string]int64        //number of positions per buy
+	lots         map[string]int64        //number of positions per buy
 	figiCurrency map[string]string       //currency to instrument figi relation
 	figiHist     map[string][]histRecord //history of each figi - to convenience interpolation
 }
@@ -72,17 +72,17 @@ func (t *MockTrader) procBg() {
 		opInfo := trmodel.OpInfo{Currency: actCurrency}
 		action.Currency = actCurrency
 		opInfo.Lim = act.GetCurrLimit(actCurrency)
-		opInfo.PosNum = t.logs[action.InstrFigi]
+		opInfo.PosNum = t.lots[action.InstrFigi]
 		var err error
-		opInfo.LotPrice, err = t.calcPrice(action.InstrFigi, action.RetrievedAt)
+		opInfo.PosPrice, err = t.calcPrice(action.InstrFigi, action.RetrievedAt)
 		if err != nil {
 			log.Printf("Error while calculating figi price: %s", err)
 			t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
 			continue
 		}
-		if opInfo.Lim.IsZero() || opInfo.PosNum == 0 || opInfo.LotPrice.IsZero() {
+		if opInfo.Lim.IsZero() || opInfo.PosNum == 0 || opInfo.PosPrice.IsZero() {
 			log.Printf("Limit or lot price is zero; figi: %s; limit: %s; lot num: %d;lot price: %s",
-				action.InstrFigi, opInfo.Lim, opInfo.PosNum, opInfo.LotPrice)
+				action.InstrFigi, opInfo.Lim, opInfo.PosNum, opInfo.PosPrice)
 			t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
 			continue
 		}
@@ -101,19 +101,20 @@ func (t *MockTrader) procBg() {
 }
 
 func (t *MockTrader) procBuy(opInfo trmodel.OpInfo, action *domain.Action, trDat *mockTraderData) {
-	onePrice := decimal.NewFromInt(opInfo.PosNum).Mul(opInfo.LotPrice)
-	if onePrice.GreaterThan(opInfo.Lim) {
+	lotPrice := decimal.NewFromInt(opInfo.PosNum).Mul(opInfo.PosPrice)
+	if lotPrice.GreaterThan(opInfo.Lim) {
 		log.Printf("Not enough money for figi %s; limit: %s; lot price: %s; one price: %s",
-			action.InstrFigi, opInfo.Lim, opInfo.LotPrice, onePrice)
+			action.InstrFigi, opInfo.Lim, opInfo.PosPrice, lotPrice)
 		t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
 	}
-	operNum := opInfo.Lim.Div(onePrice).Floor()
-	moneyAmount := operNum.Mul(onePrice)
-	instrAmount := operNum.IntPart() * opInfo.PosNum
+	lotNum := opInfo.Lim.Div(lotPrice).Floor()
+	moneyAmount := lotNum.Mul(lotPrice)
+	instrAmount := lotNum.IntPart()
 	trDat.ResInstr[action.InstrFigi] = trDat.ResInstr[action.InstrFigi] + instrAmount
 	trDat.ResAmount[opInfo.Currency] = trDat.ResAmount[opInfo.Currency].Sub(moneyAmount)
 	action.Amount = moneyAmount
 	action.LotAmount = instrAmount
+	action.PositionPrice = opInfo.PosPrice
 	trDat.BuyOper += 1
 	t.sub.RChan <- t.getRespWithStatus(action, domain.SUCCESS)
 }
@@ -123,19 +124,14 @@ func (t *MockTrader) procSell(opInfo trmodel.OpInfo, action *domain.Action, trDa
 		log.Println("LotAmount is 0 - nothing to sell")
 		t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
 	}
-	if action.LotAmount < opInfo.PosNum {
-		log.Printf("Not enough lots for one operation; requested: %d; lot num: %d", action.LotAmount, opInfo.PosNum)
-		t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
-	}
 	price, err := t.calcPrice(action.InstrFigi, action.RetrievedAt)
 	if err != nil {
 		log.Println("Can't resolve price by figi, canceling operation...")
 		t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
 	}
-	fullPart := (action.LotAmount / opInfo.PosNum) * opInfo.PosNum
-	moneyAmount := price.Mul(decimal.NewFromInt(fullPart))
+	moneyAmount := price.Mul(decimal.NewFromInt(action.LotAmount * opInfo.PosNum)) //Money amount is a price multiplied by num of positions
 	trDat.ResAmount[opInfo.Currency] = trDat.ResAmount[opInfo.Currency].Add(moneyAmount)
-	trDat.ResInstr[action.InstrFigi] = trDat.ResInstr[action.InstrFigi] - fullPart
+	trDat.ResInstr[action.InstrFigi] = trDat.ResInstr[action.InstrFigi] - action.LotAmount
 	action.Amount = moneyAmount
 	trDat.SellOper += 1
 	t.sub.RChan <- t.getRespWithStatus(action, domain.SUCCESS)
@@ -227,5 +223,5 @@ func (t MockTrader) GetStatCh() chan dto.HistStatResponse {
 
 func NewMockTrader(hRep repository.HistoryRepository, lots map[string]int64, figiCurrency map[string]string) MockTrader {
 	log.Printf("Initializing mock trader with currencies: %+v , lot nums: %+v", lots, figiCurrency)
-	return MockTrader{statCh: make(chan dto.HistStatResponse), hRep: hRep, logs: lots, figiCurrency: figiCurrency}
+	return MockTrader{statCh: make(chan dto.HistStatResponse), hRep: hRep, lots: lots, figiCurrency: figiCurrency}
 }

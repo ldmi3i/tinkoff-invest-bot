@@ -6,7 +6,7 @@ import (
 
 type OpInfo struct {
 	PosNum   int64
-	LotPrice decimal.Decimal
+	PosPrice decimal.Decimal
 	Lim      decimal.Decimal
 	Currency string
 }
