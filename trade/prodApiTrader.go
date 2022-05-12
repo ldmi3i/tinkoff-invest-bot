@@ -1,11 +1,13 @@
 package trade
 
 import (
+	"go.uber.org/zap"
 	"invest-robot/errors"
 	"invest-robot/strategy/stmodel"
 )
 
 type ProdApiTrader struct {
+	logger *zap.SugaredLogger
 }
 
 func (at *ProdApiTrader) Go() {
@@ -21,6 +23,6 @@ func (at *ProdApiTrader) RemoveSubscription(id uint) error {
 	return errors.NewNotImplemented()
 }
 
-func NewProdApiTrader() Trader {
-	return &ProdApiTrader{}
+func NewProdApiTrader(logger *zap.SugaredLogger) Trader {
+	return &ProdApiTrader{logger: logger}
 }

@@ -2,18 +2,18 @@ package strategy
 
 import (
 	"fmt"
+	"go.uber.org/zap"
 	"invest-robot/domain"
 	"invest-robot/errors"
 	"invest-robot/repository"
 	"invest-robot/service"
 	"invest-robot/strategy/avr"
 	"invest-robot/strategy/stmodel"
-	"log"
 )
 
-type algProdFunc func(req *domain.Algorithm, infoSrv service.InfoSrv) (stmodel.Algorithm, error)
-type algSandboxFunc func(req *domain.Algorithm, infoSrv service.InfoSrv) (stmodel.Algorithm, error)
-type algHistFunc func(req *domain.Algorithm, rep repository.HistoryRepository) (stmodel.Algorithm, error)
+type algProdFunc func(req *domain.Algorithm, infoSrv service.InfoSrv, logger *zap.SugaredLogger) (stmodel.Algorithm, error)
+type algSandboxFunc func(req *domain.Algorithm, infoSrv service.InfoSrv, logger *zap.SugaredLogger) (stmodel.Algorithm, error)
+type algHistFunc func(req *domain.Algorithm, rep repository.HistoryRepository, logger *zap.SugaredLogger) (stmodel.Algorithm, error)
 
 //Mapping for algorithm creation strategy
 var algMapping = make(map[string]factoryStruct)
@@ -39,48 +39,50 @@ type AlgFactory interface {
 }
 
 type DefaultAlgFactory struct {
-	hRep  repository.HistoryRepository
-	iSrv  service.InfoSrv
-	cache map[uint]*stmodel.Algorithm
+	hRep   repository.HistoryRepository
+	iSrv   service.InfoSrv
+	cache  map[uint]*stmodel.Algorithm
+	logger *zap.SugaredLogger
 }
 
 func (a DefaultAlgFactory) NewProd(alg *domain.Algorithm) (stmodel.Algorithm, error) {
-	log.Printf("Creating new PROD algorithm with strategy: %s and params: %+v", alg.Strategy, alg.Params)
+	a.logger.Infof("Creating new PROD algorithm with strategy: %s and params: %+v", alg.Strategy, alg.Params)
 	factory, exist := algMapping[alg.Strategy]
 	if !exist {
 		return nil, errors.NewUnexpectedError(
 			fmt.Sprintf("Algorithm '%s' does not exist - add mapping to strategy.factory.algMapping", alg.Strategy),
 		)
 	}
-	return factory.algProd(alg, a.iSrv)
+	return factory.algProd(alg, a.iSrv, a.logger)
 }
 
 func (a DefaultAlgFactory) NewSandbox(alg *domain.Algorithm) (stmodel.Algorithm, error) {
-	log.Printf("Creating new SANDBOX algorithm with strategy: %s and params: %+v", alg.Strategy, alg.Params)
+	a.logger.Infof("Creating new SANDBOX algorithm with strategy: %s and params: %+v", alg.Strategy, alg.Params)
 	factory, exist := algMapping[alg.Strategy]
 	if !exist {
 		return nil, errors.NewUnexpectedError(
 			fmt.Sprintf("Algorithm '%s' does not exist - add mapping to strategy.factory.algMapping", alg.Strategy),
 		)
 	}
-	return factory.algSandbox(alg, a.iSrv)
+	return factory.algSandbox(alg, a.iSrv, a.logger)
 }
 
 func (a DefaultAlgFactory) NewHist(alg *domain.Algorithm) (stmodel.Algorithm, error) {
-	log.Printf("Creating new history algorithm with strategy: %s and params: %+v", alg.Strategy, alg.Params)
+	a.logger.Infof("Creating new history algorithm with strategy: %s and params: %+v", alg.Strategy, alg.Params)
 	factory, exist := algMapping[alg.Strategy]
 	if !exist {
 		return nil, errors.NewUnexpectedError(
 			fmt.Sprintf("Algorithm '%s' does not exist - add mapping to strategy.factory.algMapping", alg.Strategy),
 		)
 	}
-	return factory.algHist(alg, a.hRep)
+	return factory.algHist(alg, a.hRep, a.logger)
 }
 
-func NewAlgFactory(srv service.InfoSrv, rep repository.HistoryRepository) AlgFactory {
+func NewAlgFactory(srv service.InfoSrv, rep repository.HistoryRepository, logger *zap.SugaredLogger) AlgFactory {
 	return DefaultAlgFactory{
-		hRep:  rep,
-		iSrv:  srv,
-		cache: make(map[uint]*stmodel.Algorithm),
+		hRep:   rep,
+		iSrv:   srv,
+		cache:  make(map[uint]*stmodel.Algorithm),
+		logger: logger,
 	}
 }

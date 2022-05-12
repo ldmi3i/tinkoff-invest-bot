@@ -1,16 +1,18 @@
 package service
 
 import (
+	"go.uber.org/zap"
 	"invest-robot/dto/tapi"
 	"invest-robot/tinapi"
 )
 
 type SandboxInfoService struct {
 	*BaseInfoSrv
+	logger *zap.SugaredLogger
 }
 
-func NewSandboxInfoService(t tinapi.Api) InfoSrv {
-	return &SandboxInfoService{newBaseSrv(t)}
+func NewSandboxInfoService(t tinapi.Api, logger *zap.SugaredLogger) InfoSrv {
+	return &SandboxInfoService{newBaseSrv(t), logger}
 }
 
 func (is *SandboxInfoService) GetPositions(req *tapi.PositionsRequest) (*tapi.PositionsResponse, error) {

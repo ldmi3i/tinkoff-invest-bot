@@ -1,6 +1,7 @@
 package robot
 
 import (
+	"go.uber.org/zap"
 	"invest-robot/helper"
 	"invest-robot/repository"
 	"invest-robot/service"
@@ -17,15 +18,17 @@ func GetContext() *Context {
 }
 
 func init() {
+	logger, _ := zap.NewDevelopment()
+	sugared := logger.Sugar()
 	tapi := tinapi.NewTinApi()
-	infoSrv := service.NewSandboxInfoService(tapi)
-	sdxTradeSrv := service.NewSandboxTradeSrv(tapi)
+	infoSrv := service.NewSandboxInfoService(tapi, sugared)
+	sdxTradeSrv := service.NewSandboxTradeSrv(tapi, sugared)
 	hRep := repository.NewHistoryRepository(helper.GetDB())
 	actionRep := repository.NewActionRepository(helper.GetDB())
-	aFact := strategy.NewAlgFactory(infoSrv, hRep)
-	aRep := repository.NewAlgoRepository()
-	sdxTrader := trade.NewSandboxTrader(infoSrv, sdxTradeSrv, actionRep)
-	prodTrader := trade.NewProdApiTrader()
+	aFact := strategy.NewAlgFactory(infoSrv, hRep, sugared)
+	aRep := repository.NewAlgoRepository(helper.GetDB())
+	sdxTrader := trade.NewSandboxTrader(infoSrv, sdxTradeSrv, actionRep, sugared)
+	prodTrader := trade.NewProdApiTrader(sugared)
 
 	ctx = Context{
 		infoSrv:     infoSrv,
@@ -36,6 +39,7 @@ func init() {
 		aFact:       aFact,
 		sdxTrader:   sdxTrader,
 		prodTrader:  prodTrader,
+		logger:      sugared,
 	}
 }
 
@@ -48,6 +52,7 @@ type Context struct {
 	aFact       strategy.AlgFactory
 	sdxTrader   trade.Trader
 	prodTrader  trade.Trader
+	logger      *zap.SugaredLogger
 }
 
 func (ctx *Context) GetSandboxInfoSrv() service.InfoSrv {
@@ -72,6 +77,10 @@ func (ctx *Context) GetSandboxTrader() trade.Trader {
 
 func (ctx *Context) GetProdTrader() trade.Trader {
 	return ctx.prodTrader
+}
+
+func (ctx *Context) GetLogger() *zap.SugaredLogger {
+	return ctx.logger
 }
 
 func StartBgTasks() {

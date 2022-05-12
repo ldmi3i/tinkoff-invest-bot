@@ -1,12 +1,14 @@
 package service
 
 import (
+	"go.uber.org/zap"
 	"invest-robot/dto/tapi"
 	"invest-robot/tinapi"
 )
 
 type SandboxTradeService struct {
 	TinApi tinapi.Api
+	logger *zap.SugaredLogger
 }
 
 func (ts *SandboxTradeService) PostOrder(req *tapi.PostOrderRequest) (*tapi.PostOrderResponse, error) {
@@ -17,6 +19,6 @@ func (ts *SandboxTradeService) GetOrderStatus(req *tapi.GetOrderStateRequest) (*
 	return ts.TinApi.GetSandboxOrderState(req)
 }
 
-func NewSandboxTradeSrv(tapi tinapi.Api) TradeService {
-	return &SandboxTradeService{TinApi: tapi}
+func NewSandboxTradeSrv(tapi tinapi.Api, logger *zap.SugaredLogger) TradeService {
+	return &SandboxTradeService{TinApi: tapi, logger: logger}
 }

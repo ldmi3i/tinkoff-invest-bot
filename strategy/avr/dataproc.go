@@ -36,7 +36,6 @@ func calcAvg(lst *collections.TList[decimal.Decimal]) (*decimal.Decimal, error) 
 	for next := lst.First(); next != nil; next = next.Next() {
 		cnt += 1
 		sum = sum.Add(next.GetData())
-		//log.Printf("Calc data: %s , count: %d", next.GetData(), cnt)
 	}
 	res := sum.Div(decimal.NewFromInt(int64(cnt)))
 	return &res, nil

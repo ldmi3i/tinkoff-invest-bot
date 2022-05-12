@@ -4,7 +4,6 @@ import (
 	"gorm.io/gorm"
 	"invest-robot/domain"
 	"invest-robot/errors"
-	"invest-robot/helper"
 )
 
 type AlgoRepository interface {
@@ -26,6 +25,6 @@ func (ar *PgAlgoRepository) Save(algo *domain.Algorithm) (err error) {
 	return nil
 }
 
-func NewAlgoRepository() AlgoRepository {
-	return &PgAlgoRepository{helper.GetDB()}
+func NewAlgoRepository(db *gorm.DB) AlgoRepository {
+	return &PgAlgoRepository{db: db}
 }

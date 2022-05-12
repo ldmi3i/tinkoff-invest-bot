@@ -2,11 +2,11 @@ package avr
 
 import (
 	"github.com/shopspring/decimal"
+	"go.uber.org/zap"
 	"invest-robot/collections"
 	"invest-robot/domain"
 	"invest-robot/errors"
 	"invest-robot/repository"
-	"log"
 	"strconv"
 	"time"
 )
@@ -18,6 +18,7 @@ type DbDataProc struct {
 	stopCh chan bool
 	hist   []domain.History
 	dtCh   chan procData
+	logger *zap.SugaredLogger
 
 	sav collections.TList[decimal.Decimal]
 	lav collections.TList[decimal.Decimal]
@@ -46,15 +47,15 @@ func (d *DbDataProc) Go() {
 }
 
 func (d *DbDataProc) procBg() {
-	log.Printf("Start processing history data, full size: %d", len(d.hist))
+	d.logger.Infof("Start processing history data, full size: %d", len(d.hist))
 	defer func() {
 		close(d.dtCh)
-		log.Printf("Data processor stopped...")
+		d.logger.Infof("Data processor stopped...")
 	}()
 	sOk := false
 	lOk := false
 	for _, hDat := range d.hist {
-		log.Printf("Processing data %+v", hDat)
+		d.logger.Debugf("Processing data %+v", hDat)
 		sPop := d.sav.Append(hDat.Close, hDat.Time)
 		lPop := d.lav.Append(hDat.Close, hDat.Time)
 		sOk = sOk || sPop
@@ -62,12 +63,12 @@ func (d *DbDataProc) procBg() {
 		if sOk && lOk {
 			sav, err := calcAvg(&d.sav)
 			if err != nil {
-				log.Printf("Error while calculating short average:\n%s", err)
+				d.logger.Errorf("Error while calculating short average:\n%s", err)
 				break
 			}
 			lav, err := calcAvg(&d.lav)
 			if err != nil {
-				log.Printf("Error while calculating long average:\n%s", err)
+				d.logger.Errorf("Error while calculating long average:\n%s", err)
 				break
 			}
 			dat := procData{
@@ -76,7 +77,7 @@ func (d *DbDataProc) procBg() {
 				LAV:  *lav,
 				SAV:  *sav,
 			}
-			log.Printf("Sending data: %+v", dat)
+			d.logger.Debugf("Sending data: %+v", dat)
 			d.dtCh <- dat
 			time.Sleep(100 * time.Microsecond) //To provide time for mockTrader to finish operation
 		}
@@ -87,12 +88,13 @@ func (d *DbDataProc) Stop() error {
 	return errors.NewNotImplemented()
 }
 
-func newHistoryDataProc(req *domain.Algorithm, rep repository.HistoryRepository) (DataProc, error) {
+func newHistoryDataProc(req *domain.Algorithm, rep repository.HistoryRepository, logger *zap.SugaredLogger) (DataProc, error) {
 	return &DbDataProc{
 		params: domain.ParamsToMap(req.Params),
 		figis:  req.Figis,
 		rep:    rep,
 		stopCh: make(chan bool, 1),
 		dtCh:   make(chan procData),
+		logger: logger,
 	}, nil
 }
