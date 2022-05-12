@@ -73,6 +73,7 @@ func (t *SandboxTrader) checkOrdersBg() {
 				action.Info = "Order successfully completed"
 				action.Amount = state.TotalPrice.Value
 				action.Currency = state.TotalPrice.Currency
+				action.PositionPrice = state.AvrPrice.Value
 				err = t.actionRep.Save(action)
 				if err != nil {
 					t.logger.Errorf("Error while updating action %+v: %s", action, err)
@@ -271,7 +272,7 @@ func (t *SandboxTrader) procBuy(opInfo *trmodel.OpInfo, action *domain.Action, s
 	t.logger.Infof("Posted buy order: %+v", order)
 	//Set amounts of money to action and update action status in db
 	action.Amount = moneyAmount
-	action.InstrAmount = lotAmount
+	action.LotAmount = lotAmount
 	t.orders.Put(order.OrderId, action)
 	t.setActionStatus(action, domain.POSTED, "Action posted successfully")
 }
@@ -279,15 +280,15 @@ func (t *SandboxTrader) procBuy(opInfo *trmodel.OpInfo, action *domain.Action, s
 //Process sell order (currently there's no limits for a sell operation)
 func (t *SandboxTrader) procSell(opInfo *trmodel.OpInfo, action *domain.Action, sub *stmodel.Subscription) {
 	//Check is requested instrument amount for a sell not zero
-	if action.InstrAmount == 0 {
-		t.logger.Warn("InstrAmount is 0 - nothing to sell")
+	if action.LotAmount == 0 {
+		t.logger.Warn("LotAmount is 0 - nothing to sell")
 		t.setActionStatus(action, domain.FAILED, "No instrument to sell found")
 		sub.RChan <- &stmodel.ActionResp{Action: action}
 		return
 	}
 	//Check is requested instrument amount not lower than instrument lot weight
-	if action.InstrAmount < opInfo.PosNum {
-		t.logger.Warnf("Not enough lots for one operation; requested: %d; lot num: %d", action.InstrAmount, opInfo.PosNum)
+	if action.LotAmount < opInfo.PosNum {
+		t.logger.Warnf("Not enough lots for one operation; requested: %d; lot num: %d", action.LotAmount, opInfo.PosNum)
 		t.setActionStatus(action, domain.FAILED, "Not enough instrument for sell")
 		sub.RChan <- &stmodel.ActionResp{Action: action}
 		return
@@ -296,7 +297,7 @@ func (t *SandboxTrader) procSell(opInfo *trmodel.OpInfo, action *domain.Action, 
 	orderId := uuid.New().String()
 	req := tapi.PostOrderRequest{
 		Figi:      action.InstrFigi,
-		PosNum:    action.InstrAmount,
+		PosNum:    action.LotAmount,
 		Direction: tapi.ORDER_DIRECTION_SELL,
 		AccountId: action.AccountID,
 		OrderType: tapi.ORDER_TYPE_MARKET,

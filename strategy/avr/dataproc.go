@@ -15,10 +15,11 @@ type DataProc interface {
 }
 
 type procData struct {
-	Figi string
-	Time time.Time
-	LAV  decimal.Decimal //average by long window
-	SAV  decimal.Decimal //average by short window
+	Figi  string
+	Time  time.Time
+	LAV   decimal.Decimal //average by long window
+	SAV   decimal.Decimal //average by short window
+	Price decimal.Decimal //current price
 }
 
 const (

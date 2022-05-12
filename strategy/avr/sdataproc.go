@@ -111,10 +111,11 @@ func (d *SandboxDataProc) procBg() {
 			break
 		}
 		dat := procData{
-			Figi: candle.Figi,
-			Time: dTime,
-			LAV:  *lav,
-			SAV:  *sav,
+			Figi:  candle.Figi,
+			Time:  dTime,
+			LAV:   *lav,
+			SAV:   *sav,
+			Price: price,
 		}
 		d.logger.Debugf("Sending data for alg %d: %+v", d.algoId, dat)
 		d.dtCh <- dat

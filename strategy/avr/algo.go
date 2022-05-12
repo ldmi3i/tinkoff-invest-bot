@@ -20,7 +20,10 @@ type AlgorithmImpl struct {
 	param     map[string]string
 	aChan     chan *stmodel.ActionReq
 	arChan    chan *stmodel.ActionResp
-	logger    *zap.SugaredLogger
+	buyPrice  map[string]decimal.Decimal
+	limWidth  decimal.Decimal
+
+	logger *zap.SugaredLogger
 }
 
 func (a *AlgorithmImpl) GetId() uint {
@@ -32,6 +35,10 @@ type algoStatus int
 const (
 	process algoStatus = iota
 	waitRes
+)
+
+const (
+	tradeLimWidth string = "limWidth"
 )
 
 type AlgoData struct {
@@ -84,7 +91,7 @@ func (a *AlgorithmImpl) procBg(datCh <-chan procData) {
 	for {
 		select {
 		case resp, ok := <-a.arChan:
-			a.logger.Debugf("Receiving response, channel state: %t , response: %+v", ok, *resp)
+			a.logger.Debugf("Receiving response, channel state: %t , response: %+v", ok, *resp.Action)
 			if ok {
 				err := a.processTraderResp(&aDat, resp)
 				if err != nil {
@@ -110,10 +117,21 @@ func (a *AlgorithmImpl) procBg(datCh <-chan procData) {
 //process response from trade.Trader after pass trading stages
 func (a *AlgorithmImpl) processTraderResp(aDat *AlgoData, resp *stmodel.ActionResp) error {
 	action := resp.Action
+	a.logger.Debug("Processing trader response: ", *resp.Action)
 	if resp.Action.Status == domain.SUCCESS {
-		iAmount := action.InstrAmount
+		iAmount := action.LotAmount
 		if action.Direction == domain.SELL {
 			iAmount = -iAmount
+			//Drops buy price - because the deal has already been completed
+			delete(a.buyPrice, action.InstrFigi)
+		} else {
+			//Checks and update previous buy limit to wait for next sell price no lower than buy price
+			price, ok := a.buyPrice[action.InstrFigi]
+			if ok {
+				a.buyPrice[action.InstrFigi] = decimal.Min(price, action.PositionPrice)
+			} else {
+				a.buyPrice[action.InstrFigi] = action.PositionPrice
+			}
 		}
 		a.logger.Infof("Incrementing instrument: %s with amount %d", action.InstrFigi, iAmount)
 		aDat.instrAmount[action.InstrFigi] = aDat.instrAmount[action.InstrFigi] + iAmount
@@ -128,7 +146,7 @@ func (a *AlgorithmImpl) processTraderResp(aDat *AlgoData, resp *stmodel.ActionRe
 func (a *AlgorithmImpl) processData(aDat *AlgoData, pDat *procData) {
 	prevDiff, exists := aDat.prev[pDat.Figi]
 	currDiff := pDat.SAV.Sub(pDat.LAV)
-	a.logger.Debugf("Difference, current: %s, prev: %s", currDiff, prevDiff)
+	a.logger.Debugf("Difference, current: %s, prev: %s, price: %s", currDiff, prevDiff, pDat.Price)
 	aDat.prev[pDat.Figi] = currDiff
 	if aDat.status != process {
 		a.logger.Debugf("Waiting in status: %d", aDat.status)
@@ -147,15 +165,22 @@ func (a *AlgorithmImpl) processData(aDat *AlgoData, pDat *procData) {
 		a.aChan <- a.makeReq(&action)
 		aDat.status = waitRes
 	} else if exists && prevDiff.IsPositive() && currDiff.IsNegative() {
-
 		amount, iExists := aDat.instrAmount[pDat.Figi]
+		buyPrice, ok := a.buyPrice[pDat.Figi]
 		a.logger.Infof("Check to sell; Instrument: %s; amount: %d", pDat.Figi, amount)
+		if ok {
+			a.logger.Infof("Buy price found. Current price: %s, buy price: %s", pDat.Price, buyPrice)
+			if buyPrice.GreaterThanOrEqual(pDat.Price) {
+				a.logger.Info("Buy price is greater than current, discarding sell...")
+				return
+			}
+		}
 		if iExists && amount != 0 {
 			action := domain.Action{
 				AlgorithmID: a.id,
 				Direction:   domain.SELL,
 				InstrFigi:   pDat.Figi,
-				InstrAmount: amount,
+				LotAmount:   amount,
 				Status:      domain.CREATED,
 				RetrievedAt: pDat.Time,
 				AccountID:   a.accountId,
@@ -187,6 +212,18 @@ func NewProd(algo *domain.Algorithm, infoSrv service.InfoSrv, logger *zap.Sugare
 	if err != nil {
 		return nil, err
 	}
+	paramMap := domain.ParamsToMap(algo.Params)
+	var limWidth decimal.Decimal
+	limWidthStr, ok := paramMap[tradeLimWidth]
+	if ok {
+		limWidth, err = decimal.NewFromString(limWidthStr)
+		if err != nil {
+			logger.Error("Error parsing limit width: ", err)
+			return nil, err
+		}
+	} else {
+		limWidth = decimal.NewFromFloat(0.01)
+	}
 	return &AlgorithmImpl{
 		id:        algo.ID,
 		isActive:  true,
@@ -194,8 +231,10 @@ func NewProd(algo *domain.Algorithm, infoSrv service.InfoSrv, logger *zap.Sugare
 		dataProc:  proc,
 		figis:     algo.Figis,
 		limits:    algo.MoneyLimits,
-		param:     domain.ParamsToMap(algo.Params),
+		param:     paramMap,
+		buyPrice:  make(map[string]decimal.Decimal),
 		logger:    logger,
+		limWidth:  limWidth,
 	}, nil
 }
 
@@ -204,22 +243,17 @@ func NewSandbox(algo *domain.Algorithm, infoSrv service.InfoSrv, logger *zap.Sug
 	if err != nil {
 		return nil, err
 	}
-	return &AlgorithmImpl{
-		id:        algo.ID,
-		isActive:  true,
-		accountId: algo.AccountId,
-		dataProc:  proc,
-		figis:     algo.Figis,
-		limits:    algo.MoneyLimits,
-		param:     domain.ParamsToMap(algo.Params),
-		logger:    logger,
-	}, nil
-}
-
-func NewHist(algo *domain.Algorithm, hRep repository.HistoryRepository, logger *zap.SugaredLogger) (stmodel.Algorithm, error) {
-	proc, err := newHistoryDataProc(algo, hRep, logger)
-	if err != nil {
-		return nil, err
+	paramMap := domain.ParamsToMap(algo.Params)
+	var limWidth decimal.Decimal
+	limWidthStr, ok := paramMap[tradeLimWidth]
+	if ok {
+		limWidth, err = decimal.NewFromString(limWidthStr)
+		if err != nil {
+			logger.Error("Error parsing limit width: ", err)
+			return nil, err
+		}
+	} else {
+		limWidth = decimal.NewFromFloat(0.01)
 	}
 	return &AlgorithmImpl{
 		id:        algo.ID,
@@ -228,7 +262,40 @@ func NewHist(algo *domain.Algorithm, hRep repository.HistoryRepository, logger *
 		dataProc:  proc,
 		figis:     algo.Figis,
 		limits:    algo.MoneyLimits,
-		param:     domain.ParamsToMap(algo.Params),
+		param:     paramMap,
+		buyPrice:  make(map[string]decimal.Decimal),
 		logger:    logger,
+		limWidth:  limWidth,
+	}, nil
+}
+
+func NewHist(algo *domain.Algorithm, hRep repository.HistoryRepository, logger *zap.SugaredLogger) (stmodel.Algorithm, error) {
+	proc, err := newHistoryDataProc(algo, hRep, logger)
+	if err != nil {
+		return nil, err
+	}
+	paramMap := domain.ParamsToMap(algo.Params)
+	var limWidth decimal.Decimal
+	limWidthStr, ok := paramMap[tradeLimWidth]
+	if ok {
+		limWidth, err = decimal.NewFromString(limWidthStr)
+		if err != nil {
+			logger.Error("Error parsing limit width: ", err)
+			return nil, err
+		}
+	} else {
+		limWidth = decimal.NewFromFloat(0.01)
+	}
+	return &AlgorithmImpl{
+		id:        algo.ID,
+		isActive:  true,
+		accountId: algo.AccountId,
+		dataProc:  proc,
+		figis:     algo.Figis,
+		limits:    algo.MoneyLimits,
+		param:     paramMap,
+		buyPrice:  make(map[string]decimal.Decimal),
+		logger:    logger,
+		limWidth:  limWidth,
 	}, nil
 }

@@ -72,10 +72,11 @@ func (d *DbDataProc) procBg() {
 				break
 			}
 			dat := procData{
-				Figi: hDat.Figi,
-				Time: hDat.Time,
-				LAV:  *lav,
-				SAV:  *sav,
+				Figi:  hDat.Figi,
+				Time:  hDat.Time,
+				LAV:   *lav,
+				SAV:   *sav,
+				Price: hDat.Close,
 			}
 			d.logger.Debugf("Sending data: %+v", dat)
 			d.dtCh <- dat
