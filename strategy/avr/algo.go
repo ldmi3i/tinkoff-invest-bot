@@ -213,6 +213,10 @@ func (a *AlgorithmImpl) Configure(ctx []domain.CtxParam) error {
 	return errors.NewNotImplemented()
 }
 
+func (a *AlgorithmImpl) GetParam() map[string]string {
+	return a.param
+}
+
 func NewProd(algo *domain.Algorithm, infoSrv service.InfoSrv, logger *zap.SugaredLogger) (stmodel.Algorithm, error) {
 	proc, err := newProdDataProc(algo, infoSrv, logger)
 	if err != nil {
@@ -275,7 +279,9 @@ func NewSandbox(algo *domain.Algorithm, infoSrv service.InfoSrv, logger *zap.Sug
 	}, nil
 }
 
-func NewHist(algo *domain.Algorithm, hRep repository.HistoryRepository, logger *zap.SugaredLogger) (stmodel.Algorithm, error) {
+func NewHist(algo *domain.Algorithm, hRep repository.HistoryRepository, rootLogger *zap.SugaredLogger) (stmodel.Algorithm, error) {
+	//New logger with Increased level to suppress history analysis not necessary logging
+	logger := zap.New(rootLogger.Desugar().Core(), zap.IncreaseLevel(zap.WarnLevel)).Sugar()
 	proc, err := newHistoryDataProc(algo, hRep, logger)
 	if err != nil {
 		return nil, err
@@ -286,7 +292,7 @@ func NewHist(algo *domain.Algorithm, hRep repository.HistoryRepository, logger *
 	if ok {
 		limWidth, err = decimal.NewFromString(limWidthStr)
 		if err != nil {
-			logger.Error("Error parsing limit width: ", err)
+			rootLogger.Error("Error parsing limit width: ", err)
 			return nil, err
 		}
 	} else {

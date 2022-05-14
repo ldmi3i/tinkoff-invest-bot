@@ -16,7 +16,7 @@ type InfoSrv interface {
 	//GetDataStream returns bidirectional data stream client
 	GetDataStream() (investapi.MarketDataStreamService_MarketDataStreamClient, error)
 	//GetAllShares return all shares, available for operating through API
-	GetAllShares() (*investapi.SharesResponse, error)
+	GetAllShares() (*investapi.SharesResponse, error) //TODO change response to DTO!
 	GetInstrumentInfoByFigi(figi string) (*tapi.InstrumentResponse, error)
 	GetOrderState(req *tapi.GetOrderStateRequest) (*tapi.GetOrderStateResponse, error)
 

@@ -18,10 +18,12 @@ func StartHttp() {
 }
 
 func historyHandlers(router *gin.Engine, ctx *robot.Context) {
-	hh := NewHistoryHandler(robot.NewHistoryAPI(ctx.GetSandboxInfoSrv(), ctx.GetHistRep(), ctx.GetAlgFactory(), ctx.GetAlgRepository()))
+	hh := NewHistoryHandler(robot.NewHistoryAPI(
+		ctx.GetSandboxInfoSrv(), ctx.GetHistRep(), ctx.GetAlgFactory(), ctx.GetAlgRepository(), ctx.GetLogger()))
 
 	router.POST("/history/load", hh.LoadHistory)
 	router.POST("/history/analyze", hh.AnalyzeHistory)
+	router.POST("/history/analyze/range", hh.AnalyzeHistoryInRange)
 }
 
 func tradeHandlers(router *gin.Engine, ctx *robot.Context) {

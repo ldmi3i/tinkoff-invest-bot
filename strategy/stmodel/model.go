@@ -14,8 +14,18 @@ type Algorithm interface {
 	Subscribe() (*Subscription, error)
 	IsActive() bool
 	GetId() uint
+	GetParam() map[string]string
 	Go() error
 	Stop() error
+}
+
+//ParamSplitter is a common interface
+//for splitting algorithm params into range of param set for analysis purposes
+//Each algorithm must have itself parameter set, delimiter and splitting logic
+//This interface must be implemented for the algorithm and added to factory to
+//provide possibility to use /analyze/range request on algorithm
+type ParamSplitter interface {
+	ParseAndSplit(param map[string]string) ([]map[string]string, error)
 }
 
 type ActionResp struct {

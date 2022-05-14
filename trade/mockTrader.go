@@ -2,13 +2,13 @@ package trade
 
 import (
 	"github.com/shopspring/decimal"
+	"go.uber.org/zap"
 	"invest-robot/domain"
 	"invest-robot/dto"
 	"invest-robot/errors"
 	"invest-robot/repository"
 	"invest-robot/strategy/stmodel"
 	"invest-robot/trade/trmodel"
-	"log"
 	"time"
 )
 
@@ -19,6 +19,7 @@ type MockTrader struct {
 	lots         map[string]int64        //number of positions per buy
 	figiCurrency map[string]string       //currency to instrument figi relation
 	figiHist     map[string][]histRecord //history of each figi - to convenience interpolation
+	logger       *zap.SugaredLogger
 }
 
 type histRecord struct {
@@ -65,7 +66,7 @@ func (t *MockTrader) procBg() {
 		trDat.LastTime = action.RetrievedAt
 		actCurrency, exst := t.figiCurrency[action.InstrFigi]
 		if !exst {
-			log.Printf("Requested unexpected figi: %s", action.InstrFigi)
+			t.logger.Warnf("Requested unexpected figi: %s", action.InstrFigi)
 			t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
 			continue
 		}
@@ -76,12 +77,12 @@ func (t *MockTrader) procBg() {
 		var err error
 		opInfo.PosPrice, err = t.calcPrice(action.InstrFigi, action.RetrievedAt)
 		if err != nil {
-			log.Printf("Error while calculating figi price: %s", err)
+			t.logger.Errorf("Error while calculating figi price: %s", err)
 			t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
 			continue
 		}
 		if opInfo.Lim.IsZero() || opInfo.PosNum == 0 || opInfo.PosPrice.IsZero() {
-			log.Printf("Limit or lot price is zero; figi: %s; limit: %s; lot num: %d;lot price: %s",
+			t.logger.Warnf("Limit or lot price is zero; figi: %s; limit: %s; lot num: %d;lot price: %s",
 				action.InstrFigi, opInfo.Lim, opInfo.PosNum, opInfo.PosPrice)
 			t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
 			continue
@@ -93,7 +94,7 @@ func (t *MockTrader) procBg() {
 		}
 	}
 
-	log.Println("Action channel closed, stopping mock trader...")
+	t.logger.Info("Action channel closed, stopping mock trader...")
 	stat := t.calcMoneyStat(&trDat)
 	stat.SellOpNum = trDat.SellOper
 	stat.BuyOpNum = trDat.BuyOper
@@ -103,7 +104,7 @@ func (t *MockTrader) procBg() {
 func (t *MockTrader) procBuy(opInfo trmodel.OpInfo, action *domain.Action, trDat *mockTraderData) {
 	lotPrice := decimal.NewFromInt(opInfo.PosNum).Mul(opInfo.PosPrice)
 	if lotPrice.GreaterThan(opInfo.Lim) {
-		log.Printf("Not enough money for figi %s; limit: %s; lot price: %s; one price: %s",
+		t.logger.Infof("Not enough money for figi %s; limit: %s; lot price: %s; one price: %s",
 			action.InstrFigi, opInfo.Lim, opInfo.PosPrice, lotPrice)
 		t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
 	}
@@ -121,12 +122,12 @@ func (t *MockTrader) procBuy(opInfo trmodel.OpInfo, action *domain.Action, trDat
 
 func (t *MockTrader) procSell(opInfo trmodel.OpInfo, action *domain.Action, trDat *mockTraderData) {
 	if action.LotAmount == 0 {
-		log.Println("LotAmount is 0 - nothing to sell")
+		t.logger.Info("LotAmount is 0 - nothing to sell")
 		t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
 	}
 	price, err := t.calcPrice(action.InstrFigi, action.RetrievedAt)
 	if err != nil {
-		log.Println("Can't resolve price by figi, canceling operation...")
+		t.logger.Error("Can't resolve price by figi, canceling operation...")
 		t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
 	}
 	moneyAmount := price.Mul(decimal.NewFromInt(action.LotAmount * opInfo.PosNum)) //Money amount is a price multiplied by num of positions
@@ -148,7 +149,7 @@ func (t MockTrader) calcMoneyStat(trDat *mockTraderData) dto.HistStatResponse {
 		if amount != 0 {
 			lotPrice, err := t.calcPrice(figi, trDat.LastTime)
 			if err != nil {
-				log.Printf("Error whle calculating price; figi: %s; time: %s", figi, trDat.LastTime)
+				t.logger.Errorf("Error whle calculating price; figi: %s; time: %s", figi, trDat.LastTime)
 			}
 			currency, exst := t.figiCurrency[figi]
 			if exst && err == nil {
@@ -208,7 +209,7 @@ func (t MockTrader) calcPrice(figi string, tm time.Time) (decimal.Decimal, error
 	lwrUnx := decimal.NewFromInt(lwrTm.Unix())
 	search := decimal.NewFromInt(tm.Unix())
 	res := lwrVal.Add(uppVal.Sub(lwrVal).Mul(search.Sub(lwrUnx)).Div(uppUnx.Sub(lwrUnx)))
-	log.Printf("Interpolate between up(val,T): (%s,%s) down (%s,%s) with result (%s,%s)",
+	t.logger.Debugf("Interpolate between up(val,T): (%s,%s) down (%s,%s) with result (%s,%s)",
 		uppVal, uppTm, lwrVal, lwrTm, res, tm)
 	return res, nil
 }
@@ -221,7 +222,7 @@ func (t MockTrader) GetStatCh() chan dto.HistStatResponse {
 	return t.statCh
 }
 
-func NewMockTrader(hRep repository.HistoryRepository, lots map[string]int64, figiCurrency map[string]string) MockTrader {
-	log.Printf("Initializing mock trader with currencies: %+v , lot nums: %+v", lots, figiCurrency)
-	return MockTrader{statCh: make(chan dto.HistStatResponse), hRep: hRep, lots: lots, figiCurrency: figiCurrency}
+func NewMockTrader(hRep repository.HistoryRepository, lots map[string]int64, figiCurrency map[string]string, logger *zap.SugaredLogger) MockTrader {
+	logger.Debugf("Initializing mock trader with currencies: %+v , lot nums: %+v", lots, figiCurrency)
+	return MockTrader{statCh: make(chan dto.HistStatResponse), hRep: hRep, lots: lots, figiCurrency: figiCurrency, logger: logger}
 }

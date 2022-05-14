@@ -23,7 +23,7 @@ func NewTradeHandler(api robot.TradeAPI) TradeHandler {
 func (h DefaultTradeHandler) TradeSandbox(c *gin.Context) {
 	var req dto.CreateAlgorithmRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		log.Printf("Error while validating AnalyzeHistory request:\n%s", err)
+		log.Printf("Error while validating CreateAlgorithm request:\n%s", err)
 		c.JSON(http.StatusBadRequest, err.Error())
 		return
 	}

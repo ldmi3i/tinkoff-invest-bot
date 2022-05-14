@@ -14,7 +14,9 @@ func initDB() {
 	dsn := fmt.Sprintf(
 		"host=%s user=%s dbname=%s port=%s sslmode=disable TimeZone=Europe/Moscow",
 		GetDbHost(), GetDbUser(), GetDbName(), GetDbPort())
-	dbConn, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	dbConn, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		CreateBatchSize: 1000,
+	})
 	if err != nil {
 		log.Fatalf("Error while connecting to db: \n%s", err)
 	}

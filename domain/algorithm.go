@@ -48,6 +48,17 @@ func ParamsToMap(params []*Param) map[string]string {
 	return res
 }
 
+func (alg *Algorithm) CopyNoParam() *Algorithm {
+	return &Algorithm{
+		Strategy:    alg.Strategy,
+		Figis:       alg.Figis,
+		MoneyLimits: alg.MoneyLimits, //Copy is ok - not modifiable
+		AccountId:   alg.AccountId,
+		CtxParams:   alg.CtxParams,
+		IsActive:    alg.IsActive,
+	}
+}
+
 func AlgorithmFromDto(req *dto.CreateAlgorithmRequest) *Algorithm {
 	params := make([]*Param, 0, len(req.Params))
 	for key, val := range req.Params {
