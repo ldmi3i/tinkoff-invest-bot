@@ -27,8 +27,12 @@ func historyHandlers(router *gin.Engine, ctx *robot.Context) {
 }
 
 func tradeHandlers(router *gin.Engine, ctx *robot.Context) {
-	th := NewTradeHandler(robot.NewSandboxTradeAPI(ctx.GetSandboxInfoSrv(), ctx.GetAlgFactory(), ctx.GetAlgRepository(),
-		ctx.GetSandboxTrader(), ctx.GetProdTrader(), ctx.GetLogger()))
+	sandboxApi := robot.NewSandboxTradeAPI(ctx.GetSandboxInfoSrv(), ctx.GetAlgFactory(), ctx.GetAlgRepository(),
+		ctx.GetSandboxTrader(), ctx.GetLogger())
+	prodApi := robot.NewTradeProdAPI(ctx.GetProdInfoSrv(), ctx.GetAlgFactory(), ctx.GetAlgRepository(),
+		ctx.GetProdTrader(), ctx.GetLogger())
+	th := NewTradeHandler(sandboxApi, prodApi)
 
 	router.POST("/trade/sandbox", th.TradeSandbox)
+	router.POST("/trade/prod", th.TradeProd)
 }

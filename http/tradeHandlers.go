@@ -10,17 +10,27 @@ import (
 
 type TradeHandler interface {
 	TradeSandbox(c *gin.Context)
+	TradeProd(c *gin.Context)
 }
 
 type DefaultTradeHandler struct {
-	api robot.TradeAPI
+	sandboxApi robot.TradeAPI
+	prodApi    robot.TradeAPI
 }
 
-func NewTradeHandler(api robot.TradeAPI) TradeHandler {
-	return DefaultTradeHandler{api}
+func NewTradeHandler(sandboxApi robot.TradeAPI, prodApi robot.TradeAPI) TradeHandler {
+	return &DefaultTradeHandler{sandboxApi, prodApi}
 }
 
-func (h DefaultTradeHandler) TradeSandbox(c *gin.Context) {
+func (h *DefaultTradeHandler) TradeSandbox(c *gin.Context) {
+	h.trade(c, h.sandboxApi)
+}
+
+func (h *DefaultTradeHandler) TradeProd(c *gin.Context) {
+	h.trade(c, h.prodApi)
+}
+
+func (h *DefaultTradeHandler) trade(c *gin.Context, api robot.TradeAPI) {
 	var req dto.CreateAlgorithmRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		log.Printf("Error while validating CreateAlgorithm request:\n%s", err)
@@ -28,7 +38,7 @@ func (h DefaultTradeHandler) TradeSandbox(c *gin.Context) {
 		return
 	}
 	log.Printf("Start sandbox trading: %+v", req)
-	stat, err := h.api.TradeSandbox(&req)
+	stat, err := api.Trade(&req)
 	if err != nil {
 		log.Printf("Error while analyzing history:\n%s", err)
 		c.JSON(http.StatusInternalServerError, err.Error())

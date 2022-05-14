@@ -21,42 +21,52 @@ func init() {
 	logger, _ := zap.NewDevelopment()
 	sugared := logger.Sugar()
 	tapi := tinapi.NewTinApi()
-	infoSrv := service.NewSandboxInfoService(tapi, sugared)
-	sdxTradeSrv := service.NewSandboxTradeSrv(tapi, sugared)
+	infoSdxSrv := service.NewInfoSandboxService(tapi, sugared)
+	infoProdSrv := service.NewInfoProdService(tapi, sugared)
+	tradeSdxSrv := service.NewTradeSandboxSrv(tapi, sugared)
+	tradeProdSrv := service.NewTradeProdService(tapi, sugared)
 	hRep := repository.NewHistoryRepository(helper.GetDB())
 	actionRep := repository.NewActionRepository(helper.GetDB())
-	aFact := strategy.NewAlgFactory(infoSrv, hRep, sugared)
+	aFact := strategy.NewAlgFactory(infoSdxSrv, hRep, sugared)
 	aRep := repository.NewAlgoRepository(helper.GetDB())
-	sdxTrader := trade.NewSandboxTrader(infoSrv, sdxTradeSrv, actionRep, sugared)
+	sdxTrader := trade.NewSandboxTrader(infoSdxSrv, tradeSdxSrv, actionRep, sugared)
 	prodTrader := trade.NewProdApiTrader(sugared)
 
 	ctx = Context{
-		infoSrv:     infoSrv,
-		sdxTradeSrv: sdxTradeSrv,
-		hRep:        hRep,
-		aRep:        aRep,
-		actionRep:   actionRep,
-		aFact:       aFact,
-		sdxTrader:   sdxTrader,
-		prodTrader:  prodTrader,
-		logger:      sugared,
+		infoSdxSrv:   infoSdxSrv,
+		infoProdSrv:  infoProdSrv,
+		tradeSdxSrv:  tradeSdxSrv,
+		tradeProdSrv: tradeProdSrv,
+		hRep:         hRep,
+		aRep:         aRep,
+		actionRep:    actionRep,
+		aFact:        aFact,
+		sdxTrader:    sdxTrader,
+		prodTrader:   prodTrader,
+		logger:       sugared,
 	}
 }
 
 type Context struct {
-	infoSrv     service.InfoSrv
-	sdxTradeSrv service.TradeService
-	hRep        repository.HistoryRepository
-	aRep        repository.AlgoRepository
-	actionRep   repository.ActionRepository
-	aFact       strategy.AlgFactory
-	sdxTrader   trade.Trader
-	prodTrader  trade.Trader
-	logger      *zap.SugaredLogger
+	infoSdxSrv   service.InfoSrv
+	infoProdSrv  service.InfoSrv
+	tradeSdxSrv  service.TradeService
+	tradeProdSrv service.TradeService
+	hRep         repository.HistoryRepository
+	aRep         repository.AlgoRepository
+	actionRep    repository.ActionRepository
+	aFact        strategy.AlgFactory
+	sdxTrader    trade.Trader
+	prodTrader   trade.Trader
+	logger       *zap.SugaredLogger
 }
 
 func (ctx *Context) GetSandboxInfoSrv() service.InfoSrv {
-	return ctx.infoSrv
+	return ctx.infoSdxSrv
+}
+
+func (ctx *Context) GetProdInfoSrv() service.InfoSrv {
+	return ctx.infoProdSrv
 }
 
 func (ctx *Context) GetHistRep() repository.HistoryRepository {
