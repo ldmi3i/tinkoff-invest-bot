@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-type SandboxDataProc struct {
+type DataProcProd struct {
 	stream  investapi.MarketDataStreamService_MarketDataStreamClient
 	algo    *domain.Algorithm
 	infoSrv service.InfoSrv
@@ -31,7 +31,7 @@ type SandboxDataProc struct {
 	logger  *zap.SugaredLogger
 }
 
-func (d *SandboxDataProc) GetDataStream() (<-chan procData, error) {
+func (d *DataProcProd) GetDataStream() (<-chan procData, error) {
 	shortDur, err := strconv.Atoi(d.params[ShortDur])
 	if err != nil {
 		return nil, err
@@ -55,11 +55,11 @@ func (d *SandboxDataProc) GetDataStream() (<-chan procData, error) {
 	return d.dtCh, nil
 }
 
-func (d *SandboxDataProc) Go() {
+func (d *DataProcProd) Go() {
 	go d.procBg()
 }
 
-func (d *SandboxDataProc) procBg() {
+func (d *DataProcProd) procBg() {
 	defer func() {
 		close(d.dtCh)
 		d.logger.Infof("Data processor stopped, id %d...", d.algoId)
@@ -122,7 +122,7 @@ func (d *SandboxDataProc) procBg() {
 	}
 }
 
-func (d *SandboxDataProc) prefetchHistory() error {
+func (d *DataProcProd) prefetchHistory() error {
 	endTime := time.Now()
 	dur := time.Duration(-d.longDur) * time.Second
 	startTime := endTime.Add(dur)
@@ -139,7 +139,7 @@ func (d *SandboxDataProc) prefetchHistory() error {
 	return nil
 }
 
-func (d *SandboxDataProc) subscribe() error {
+func (d *DataProcProd) subscribe() error {
 	d.logger.Info("Subscribing to figis: ", d.figis)
 	instruments := make([]*investapi.CandleInstrument, 0, len(d.figis))
 	for _, figi := range d.figis {
@@ -173,7 +173,7 @@ func (d *SandboxDataProc) subscribe() error {
 	return nil
 }
 
-func (d *SandboxDataProc) unsubscribe() error {
+func (d *DataProcProd) unsubscribe() error {
 	d.logger.Info("Unsubscribe data processor...")
 	body := investapi.SubscribeCandlesRequest{
 		SubscriptionAction: investapi.SubscriptionAction_SUBSCRIPTION_ACTION_UNSUBSCRIBE,
@@ -196,12 +196,12 @@ func (d *SandboxDataProc) unsubscribe() error {
 	return nil
 }
 
-func (d *SandboxDataProc) Stop() error {
+func (d *DataProcProd) Stop() error {
 	return errors.NewNotImplemented()
 }
 
-func newSandboxDataProc(req *domain.Algorithm, infoSrv service.InfoSrv, logger *zap.SugaredLogger) (DataProc, error) {
-	return &SandboxDataProc{
+func newDataProc(req *domain.Algorithm, infoSrv service.InfoSrv, logger *zap.SugaredLogger) (DataProc, error) {
+	return &DataProcProd{
 		algo:    req,
 		infoSrv: infoSrv,
 		algoId:  req.ID,

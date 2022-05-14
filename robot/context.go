@@ -27,10 +27,10 @@ func init() {
 	tradeProdSrv := service.NewTradeProdService(tapi, sugared)
 	hRep := repository.NewHistoryRepository(helper.GetDB())
 	actionRep := repository.NewActionRepository(helper.GetDB())
-	aFact := strategy.NewAlgFactory(infoSdxSrv, hRep, sugared)
+	aFact := strategy.NewAlgFactory(infoSdxSrv, infoProdSrv, hRep, sugared)
 	aRep := repository.NewAlgoRepository(helper.GetDB())
 	sdxTrader := trade.NewSandboxTrader(infoSdxSrv, tradeSdxSrv, actionRep, sugared)
-	prodTrader := trade.NewProdApiTrader(sugared)
+	prodTrader := trade.NewProdTrader(infoProdSrv, tradeProdSrv, actionRep, sugared)
 
 	ctx = Context{
 		infoSdxSrv:   infoSdxSrv,
@@ -96,5 +96,5 @@ func (ctx *Context) GetLogger() *zap.SugaredLogger {
 func StartBgTasks() {
 	log.Println("Starting background tasks...")
 	ctx.sdxTrader.Go()
-	//TODO add prod trader bg start
+	ctx.prodTrader.Go()
 }

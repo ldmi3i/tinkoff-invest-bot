@@ -18,12 +18,16 @@ type algHistFunc func(req *domain.Algorithm, rep repository.HistoryRepository, l
 //Mapping for algorithm creation strategy
 var algMapping = make(map[string]factoryStruct)
 
-func init() {
+//Mapping for parameter splitter for algorithm
+var parSplMapping = make(map[string]stmodel.ParamSplitter)
+
+func initialize(logger *zap.SugaredLogger) {
 	algMapping["avr"] = factoryStruct{
 		algProd:    avr.NewProd,
 		algSandbox: avr.NewSandbox,
 		algHist:    avr.NewHist,
 	}
+	parSplMapping["avr"] = avr.NewParamSplitter(logger)
 }
 
 type factoryStruct struct {
@@ -40,13 +44,11 @@ type AlgFactory interface {
 }
 
 type DefaultAlgFactory struct {
-	hRep   repository.HistoryRepository
-	iSrv   service.InfoSrv
-	cache  map[uint]*stmodel.Algorithm
-	logger *zap.SugaredLogger
-
-	//Mapping for parameter splitter for algorithm
-	parSplMapping map[string]stmodel.ParamSplitter
+	hRep        repository.HistoryRepository
+	infoSdxSrv  service.InfoSrv
+	infoProdSrv service.InfoSrv
+	cache       map[uint]*stmodel.Algorithm
+	logger      *zap.SugaredLogger
 }
 
 func (a *DefaultAlgFactory) NewProd(alg *domain.Algorithm) (stmodel.Algorithm, error) {
@@ -57,7 +59,7 @@ func (a *DefaultAlgFactory) NewProd(alg *domain.Algorithm) (stmodel.Algorithm, e
 			fmt.Sprintf("Algorithm '%s' does not exist - add mapping to strategy.factory.algMapping", alg.Strategy),
 		)
 	}
-	return factory.algProd(alg, a.iSrv, a.logger)
+	return factory.algProd(alg, a.infoSdxSrv, a.logger)
 }
 
 func (a *DefaultAlgFactory) NewSandbox(alg *domain.Algorithm) (stmodel.Algorithm, error) {
@@ -68,7 +70,7 @@ func (a *DefaultAlgFactory) NewSandbox(alg *domain.Algorithm) (stmodel.Algorithm
 			fmt.Sprintf("Algorithm '%s' does not exist - add mapping to strategy.factory.algMapping", alg.Strategy),
 		)
 	}
-	return factory.algSandbox(alg, a.iSrv, a.logger)
+	return factory.algSandbox(alg, a.infoSdxSrv, a.logger)
 }
 
 func (a *DefaultAlgFactory) NewHist(alg *domain.Algorithm) (stmodel.Algorithm, error) {
@@ -85,7 +87,7 @@ func (a *DefaultAlgFactory) NewHist(alg *domain.Algorithm) (stmodel.Algorithm, e
 // NewRange Generates range of algorithms working on history data
 func (a *DefaultAlgFactory) NewRange(alg *domain.Algorithm) ([]stmodel.Algorithm, error) {
 	a.logger.Infof("Split algo with strategy: %s with params: %+v", alg.Strategy, alg.Params)
-	splitter, ok := a.parSplMapping[alg.Strategy]
+	splitter, ok := parSplMapping[alg.Strategy]
 	if !ok {
 		a.logger.Errorf("Splitter for strategy: %s not found", alg.Strategy)
 		return nil, errors.NewUnexpectedError("Splitter not found")
@@ -114,15 +116,15 @@ func (a *DefaultAlgFactory) NewRange(alg *domain.Algorithm) ([]stmodel.Algorithm
 	return algoRange, nil
 }
 
-func NewAlgFactory(srv service.InfoSrv, rep repository.HistoryRepository, logger *zap.SugaredLogger) AlgFactory {
-	parSplMapping := make(map[string]stmodel.ParamSplitter)
-	parSplMapping["avr"] = avr.NewParamSplitter(logger)
+func NewAlgFactory(infoSdxSrv service.InfoSrv, infoProdSrv service.InfoSrv, rep repository.HistoryRepository,
+	logger *zap.SugaredLogger) AlgFactory {
+	initialize(logger)
 
 	return &DefaultAlgFactory{
-		hRep:          rep,
-		iSrv:          srv,
-		cache:         make(map[uint]*stmodel.Algorithm),
-		parSplMapping: parSplMapping,
-		logger:        logger,
+		hRep:        rep,
+		infoSdxSrv:  infoSdxSrv,
+		infoProdSrv: infoProdSrv,
+		cache:       make(map[uint]*stmodel.Algorithm),
+		logger:      logger,
 	}
 }

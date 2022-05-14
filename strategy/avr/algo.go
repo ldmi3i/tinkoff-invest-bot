@@ -218,7 +218,7 @@ func (a *AlgorithmImpl) GetParam() map[string]string {
 }
 
 func NewProd(algo *domain.Algorithm, infoSrv service.InfoSrv, logger *zap.SugaredLogger) (stmodel.Algorithm, error) {
-	proc, err := newProdDataProc(algo, infoSrv, logger)
+	proc, err := newDataProc(algo, infoSrv, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -249,7 +249,7 @@ func NewProd(algo *domain.Algorithm, infoSrv service.InfoSrv, logger *zap.Sugare
 }
 
 func NewSandbox(algo *domain.Algorithm, infoSrv service.InfoSrv, logger *zap.SugaredLogger) (stmodel.Algorithm, error) {
-	proc, err := newSandboxDataProc(algo, infoSrv, logger)
+	proc, err := newDataProc(algo, infoSrv, logger)
 	if err != nil {
 		return nil, err
 	}
