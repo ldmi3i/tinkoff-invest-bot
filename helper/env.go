@@ -23,12 +23,11 @@ func initEnv() {
 	grpcAddr = getOrDefault("TIN_ADDRESS", "invest-public-api.tinkoff.ru:443")
 
 	dbUser = getOrDefault("DB_USER", "postgres")
-	dbPasswd = getOrDefault("DB_PASSWD", "postgres")
+	dbPasswd = getOrDefault("DB_PASSWORD", "postgres")
 	dbHost = getOrDefault("DB_HOST", "localhost")
 	dbPort = getOrDefault("DB_PORT", "5432")
 	dbName = getOrDefault("DB_NAME", "invest-bot")
 
-	srvHost = getOrDefault("SERVER_HOST", "localhost")
 	srvPort = getOrDefault("SERVER_PORT", "8017")
 }
 

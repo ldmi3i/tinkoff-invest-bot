@@ -1,12 +1,20 @@
 version: '3.9'
 
+volumes:
+  pg-data:
+    driver: local
+
 services:
-  postgres:
+  postgres-db:
     image: postgres
     environment:
       POSTGRES_PASSWORD: "54643243325"
-      POSTGRES_USER: "postgres"
+      POSTGRES_USER: "user"
       POSTGRES_DB: "invest-bot"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
 
   invest-bot:
     container_name: invest-bot
@@ -14,12 +22,17 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      DB_USER: "postgres"
-      DB_HOST: "postgres"
+      DB_USER: "user"
+      DB_HOST: "postgres-db"
+      DB_PORT: "5432"
       DB_PASSWORD: "54643243325"
+      GIN_MODE: "release"
       GRPC_GO_LOG_SEVERITY_LEVEL: "info"
       GRPC_GO_LOG_VERBOSITY_LEVEL: "99"
-      TIN_ADDRESS: "invest-public-api:tinkoff:ru:443"
       TIN_TOKEN: "t.RpF5XdaXJIta0w9DPQ5Nn7uuIASL7ASH6C7MhYQuCutc3Fxoedc9DPFDwI4npN-WQKdSQZjOBBS27rhn9-oCzw"
     depends_on:
-      - postgres
+      - postgres-db
+    links:
+      - postgres-db
+    ports:
+      - "8017:8017"

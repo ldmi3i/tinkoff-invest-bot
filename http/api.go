@@ -14,7 +14,7 @@ func StartHttp() {
 	historyHandlers(router, ctx)
 	tradeHandlers(router, ctx)
 
-	log.Fatal(router.Run(fmt.Sprintf("%s:%s", helper.GetSrvHost(), helper.GetSrvPort())))
+	log.Fatal(router.Run(fmt.Sprintf(":%s", helper.GetSrvPort())))
 }
 
 func historyHandlers(router *gin.Engine, ctx *robot.Context) {

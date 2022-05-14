@@ -12,8 +12,8 @@ var db *gorm.DB
 
 func initDB() {
 	dsn := fmt.Sprintf(
-		"host=%s user=%s dbname=%s port=%s sslmode=disable TimeZone=Europe/Moscow",
-		GetDbHost(), GetDbUser(), GetDbName(), GetDbPort())
+		"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=Europe/Moscow",
+		GetDbHost(), GetDbUser(), GetDbPasswd(), GetDbName(), GetDbPort())
 	dbConn, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		CreateBatchSize: 1000,
 	})
