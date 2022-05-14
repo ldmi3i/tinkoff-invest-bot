@@ -1,6 +1,9 @@
 package dto
 
-import "github.com/shopspring/decimal"
+import (
+	"fmt"
+	"github.com/shopspring/decimal"
+)
 
 type HistStatResponse struct {
 	BuyOpNum   uint                       `json:"buyOpNum"`
@@ -12,4 +15,8 @@ type HistStatIdDto struct {
 	Id       uint
 	HistStat *HistStatResponse
 	Param    map[string]string
+}
+
+func (hs HistStatIdDto) String() string {
+	return fmt.Sprintf("HistStatIdDto(ID: %d; Param: %s; HistStat: %v)", hs.Id, hs.Param, *hs.HistStat)
 }
