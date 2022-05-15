@@ -73,7 +73,7 @@ func (t *MockTrader) procBg() {
 		opInfo := trmodel.OpInfo{Currency: actCurrency}
 		action.Currency = actCurrency
 		opInfo.Lim = act.GetCurrLimit(actCurrency)
-		opInfo.PosNum = t.lots[action.InstrFigi]
+		opInfo.PosInLot = t.lots[action.InstrFigi]
 		var err error
 		opInfo.PosPrice, err = t.calcPrice(action.InstrFigi, action.RetrievedAt)
 		if err != nil {
@@ -81,9 +81,9 @@ func (t *MockTrader) procBg() {
 			t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
 			continue
 		}
-		if opInfo.Lim.IsZero() || opInfo.PosNum == 0 || opInfo.PosPrice.IsZero() {
-			t.logger.Warnf("Limit or lot price is zero; figi: %s; limit: %s; lot num: %d;lot price: %s",
-				action.InstrFigi, opInfo.Lim, opInfo.PosNum, opInfo.PosPrice)
+		if opInfo.Lim.IsZero() || opInfo.PosInLot == 0 || opInfo.PosPrice.IsZero() {
+			t.logger.Warnf("Limit or lot price is zero; figi: %s; limit: %s; pos in lot: %d;lot price: %s",
+				action.InstrFigi, opInfo.Lim, opInfo.PosInLot, opInfo.PosPrice)
 			t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
 			continue
 		}
@@ -102,7 +102,7 @@ func (t *MockTrader) procBg() {
 }
 
 func (t *MockTrader) procBuy(opInfo trmodel.OpInfo, action *domain.Action, trDat *mockTraderData) {
-	lotPrice := decimal.NewFromInt(opInfo.PosNum).Mul(opInfo.PosPrice)
+	lotPrice := decimal.NewFromInt(opInfo.PosInLot).Mul(opInfo.PosPrice)
 	if lotPrice.GreaterThan(opInfo.Lim) {
 		t.logger.Infof("Not enough money for figi %s; limit: %s; lot price: %s; one price: %s",
 			action.InstrFigi, opInfo.Lim, opInfo.PosPrice, lotPrice)
@@ -116,6 +116,7 @@ func (t *MockTrader) procBuy(opInfo trmodel.OpInfo, action *domain.Action, trDat
 	action.Amount = moneyAmount
 	action.LotAmount = instrAmount
 	action.PositionPrice = opInfo.PosPrice
+	action.LotsExecuted = instrAmount
 	trDat.BuyOper += 1
 	t.sub.RChan <- t.getRespWithStatus(action, domain.SUCCESS)
 }
@@ -130,7 +131,7 @@ func (t *MockTrader) procSell(opInfo trmodel.OpInfo, action *domain.Action, trDa
 		t.logger.Error("Can't resolve price by figi, canceling operation...")
 		t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
 	}
-	moneyAmount := price.Mul(decimal.NewFromInt(action.LotAmount * opInfo.PosNum)) //Money amount is a price multiplied by num of positions
+	moneyAmount := price.Mul(decimal.NewFromInt(action.LotAmount * opInfo.PosInLot)) //Money amount is a price multiplied by num of positions
 	trDat.ResAmount[opInfo.Currency] = trDat.ResAmount[opInfo.Currency].Add(moneyAmount)
 	trDat.ResInstr[action.InstrFigi] = trDat.ResInstr[action.InstrFigi] - action.LotAmount
 	action.Amount = moneyAmount

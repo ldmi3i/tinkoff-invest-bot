@@ -18,6 +18,11 @@ type TradeProdAPI struct {
 	logger     *zap.SugaredLogger
 }
 
+func (t *TradeProdAPI) GetActiveAlgorithms() (*dto.ActiveAlgorithmResponse, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (t *TradeProdAPI) Trade(req *dto.CreateAlgorithmRequest) (*dto.TradeStartResponse, error) {
 	t.logger.Info("Requested new algorithm ", req)
 	algDm := domain.AlgorithmFromDto(req)

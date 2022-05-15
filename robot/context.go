@@ -36,10 +36,14 @@ func init() {
 	infoProdSrv := service.NewInfoProdService(tapi, sugared)
 	tradeSdxSrv := service.NewTradeSandboxSrv(tapi, sugared)
 	tradeProdSrv := service.NewTradeProdService(tapi, sugared)
+
 	hRep := repository.NewHistoryRepository(helper.GetDB())
 	actionRep := repository.NewActionRepository(helper.GetDB())
-	aFact := strategy.NewAlgFactory(infoSdxSrv, infoProdSrv, hRep, sugared)
 	aRep := repository.NewAlgoRepository(helper.GetDB())
+	statRep := repository.NewStatRepository(helper.GetDB())
+
+	statSrv := service.NewStatService(statRep, sugared)
+	aFact := strategy.NewAlgFactory(infoSdxSrv, infoProdSrv, hRep, sugared)
 	sdxTrader := trade.NewSandboxTrader(infoSdxSrv, tradeSdxSrv, actionRep, sugared)
 	prodTrader := trade.NewProdTrader(infoProdSrv, tradeProdSrv, actionRep, sugared)
 
@@ -48,9 +52,11 @@ func init() {
 		infoProdSrv:  infoProdSrv,
 		tradeSdxSrv:  tradeSdxSrv,
 		tradeProdSrv: tradeProdSrv,
+		statSrv:      statSrv,
 		hRep:         hRep,
 		aRep:         aRep,
 		actionRep:    actionRep,
+		statRep:      statRep,
 		aFact:        aFact,
 		sdxTrader:    sdxTrader,
 		prodTrader:   prodTrader,
@@ -63,9 +69,11 @@ type Context struct {
 	infoProdSrv  service.InfoSrv
 	tradeSdxSrv  service.TradeService
 	tradeProdSrv service.TradeService
+	statSrv      service.StatService
 	hRep         repository.HistoryRepository
 	aRep         repository.AlgoRepository
 	actionRep    repository.ActionRepository
+	statRep      repository.StatRepository
 	aFact        strategy.AlgFactory
 	sdxTrader    trade.Trader
 	prodTrader   trade.Trader
@@ -102,6 +110,10 @@ func (ctx *Context) GetProdTrader() trade.Trader {
 
 func (ctx *Context) GetLogger() *zap.SugaredLogger {
 	return ctx.logger
+}
+
+func (ctx *Context) GetStatService() service.StatService {
+	return ctx.statSrv
 }
 
 func StartBgTasks() {

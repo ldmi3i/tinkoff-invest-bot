@@ -2,9 +2,9 @@ package http
 
 import (
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 	"invest-robot/dto"
 	"invest-robot/robot"
-	"log"
 	"net/http"
 )
 
@@ -16,10 +16,11 @@ type TradeHandler interface {
 type DefaultTradeHandler struct {
 	sandboxApi robot.TradeAPI
 	prodApi    robot.TradeAPI
+	logger     *zap.SugaredLogger
 }
 
-func NewTradeHandler(sandboxApi robot.TradeAPI, prodApi robot.TradeAPI) TradeHandler {
-	return &DefaultTradeHandler{sandboxApi, prodApi}
+func NewTradeHandler(sandboxApi robot.TradeAPI, prodApi robot.TradeAPI, logger *zap.SugaredLogger) TradeHandler {
+	return &DefaultTradeHandler{sandboxApi, prodApi, logger}
 }
 
 func (h *DefaultTradeHandler) TradeSandbox(c *gin.Context) {
@@ -33,14 +34,14 @@ func (h *DefaultTradeHandler) TradeProd(c *gin.Context) {
 func (h *DefaultTradeHandler) trade(c *gin.Context, api robot.TradeAPI) {
 	var req dto.CreateAlgorithmRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		log.Printf("Error while validating CreateAlgorithm request:\n%s", err)
+		h.logger.Errorf("Error while validating CreateAlgorithm request:\n%s", err)
 		c.JSON(http.StatusBadRequest, err.Error())
 		return
 	}
-	log.Printf("Start sandbox trading: %+v", req)
+	h.logger.Infof("Start sandbox trading: %+v", req)
 	stat, err := api.Trade(&req)
 	if err != nil {
-		log.Printf("Error while analyzing history:\n%s", err)
+		h.logger.Errorf("Error while analyzing history:\n%s", err)
 		c.JSON(http.StatusInternalServerError, err.Error())
 		return
 	}

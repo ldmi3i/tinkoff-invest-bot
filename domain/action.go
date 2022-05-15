@@ -31,8 +31,9 @@ type Action struct {
 	Status        ActionStatus
 	Info          string          //failed details etc.
 	Currency      string          //real currency used for buy/sell
-	Amount        decimal.Decimal //real amount with taxes
-	PositionPrice decimal.Decimal //position price
+	Amount        decimal.Decimal `gorm:"type:numeric"` //real amount with taxes
+	PositionPrice decimal.Decimal `gorm:"type:numeric"` //position price
+	LotsExecuted  int64           `gorm:"default:0"`
 	OrderId       string
 	RetrievedAt   time.Time
 	CreatedAt     time.Time

@@ -13,13 +13,16 @@ func StartHttp() {
 	ctx := robot.GetContext()
 	historyHandlers(router, ctx)
 	tradeHandlers(router, ctx)
+	statHandlers(router, ctx)
 
 	log.Fatal(router.Run(fmt.Sprintf(":%s", helper.GetSrvPort())))
 }
 
 func historyHandlers(router *gin.Engine, ctx *robot.Context) {
 	hh := NewHistoryHandler(robot.NewHistoryAPI(
-		ctx.GetSandboxInfoSrv(), ctx.GetHistRep(), ctx.GetAlgFactory(), ctx.GetAlgRepository(), ctx.GetLogger()))
+		ctx.GetSandboxInfoSrv(), ctx.GetHistRep(), ctx.GetAlgFactory(), ctx.GetAlgRepository(), ctx.GetLogger()),
+		ctx.GetLogger(),
+	)
 
 	router.POST("/history/load", hh.LoadHistory)
 	router.POST("/history/analyze", hh.AnalyzeHistory)
@@ -31,8 +34,15 @@ func tradeHandlers(router *gin.Engine, ctx *robot.Context) {
 		ctx.GetSandboxTrader(), ctx.GetLogger())
 	prodApi := robot.NewTradeProdAPI(ctx.GetProdInfoSrv(), ctx.GetAlgFactory(), ctx.GetAlgRepository(),
 		ctx.GetProdTrader(), ctx.GetLogger())
-	th := NewTradeHandler(sandboxApi, prodApi)
+	th := NewTradeHandler(sandboxApi, prodApi, ctx.GetLogger())
 
 	router.POST("/trade/sandbox", th.TradeSandbox)
 	router.POST("/trade/prod", th.TradeProd)
+}
+
+func statHandlers(router *gin.Engine, ctx *robot.Context) {
+	statApi := robot.NewStatAPI(ctx.GetStatService(), ctx.GetLogger())
+	st := NewStatHandler(statApi, ctx.GetLogger())
+
+	router.GET("/stat/algorithm", st.AlgorithmStat)
 }

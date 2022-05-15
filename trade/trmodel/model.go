@@ -5,7 +5,7 @@ import (
 )
 
 type OpInfo struct {
-	PosNum   int64
+	PosInLot int64
 	PosPrice decimal.Decimal
 	Lim      decimal.Decimal
 	Currency string

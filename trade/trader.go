@@ -75,6 +75,7 @@ func (t *BaseTrader) checkOrdersBg() {
 				action.Amount = state.TotalPrice.Value
 				action.Currency = state.TotalPrice.Currency
 				action.PositionPrice = state.AvrPrice.Value
+				action.LotsExecuted = state.LotsExec
 				err = t.actionRep.Save(action)
 				if err != nil {
 					t.logger.Errorf("Error while updating action %+v: %s", action, err)
@@ -195,7 +196,7 @@ func (t *BaseTrader) preprocessAction(req *stmodel.ActionReq, subscription *stmo
 		return nil, false
 	}
 	opInfo := trmodel.OpInfo{
-		Currency: action.Currency, Lim: req.GetCurrLimit(action.Currency), PosNum: instrInfo.Lot}
+		Currency: action.Currency, Lim: req.GetCurrLimit(action.Currency), PosInLot: instrInfo.Lot}
 	if opInfo.Lim.IsZero() {
 		t.logger.Warnf("Limit for currency %s not set, discarding order", action.Currency)
 		t.setActionStatus(action, domain.FAILED, "Limit by requested currency not set")
@@ -219,7 +220,7 @@ func (t *BaseTrader) preprocessAction(req *stmodel.ActionReq, subscription *stmo
 func (t *BaseTrader) procBuy(opInfo *trmodel.OpInfo, action *domain.Action, sub *stmodel.Subscription) {
 	t.logger.Debug("Starting buy for action ", action.ID)
 	//Calculating price for single buy operation multiple to instrument weight
-	lotPrice := decimal.NewFromInt(opInfo.PosNum).Mul(opInfo.PosPrice)
+	lotPrice := decimal.NewFromInt(opInfo.PosInLot).Mul(opInfo.PosPrice)
 	//Check is minimum instrument price exceed the limit
 	if lotPrice.GreaterThan(opInfo.Lim) {
 		t.logger.Warnf("Limit lower than minimal buy price, figi %s; limit: %s; lot price: %s; one price: %s",
@@ -247,7 +248,7 @@ func (t *BaseTrader) procBuy(opInfo *trmodel.OpInfo, action *domain.Action, sub 
 	//Check is account has available amount of money for operation
 	if moneyAvail == nil || moneyAvail.Value.LessThan(moneyAmount) {
 		t.logger.Warnf("Not enough money for figi %s;  lot price: %s; lot num: %d; required money: %s; available money: %s",
-			action.InstrFigi, opInfo.PosPrice, opInfo.PosNum, moneyAmount, moneyAvail)
+			action.InstrFigi, opInfo.PosPrice, opInfo.PosInLot, moneyAmount, moneyAvail)
 		t.setActionStatus(action, domain.FAILED, fmt.Sprintf("No money for operation"))
 		sub.RChan <- &stmodel.ActionResp{Action: action}
 		return
