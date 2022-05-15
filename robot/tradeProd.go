@@ -40,7 +40,7 @@ func (t *TradeProdAPI) Trade(req *dto.CreateAlgorithmRequest) (*dto.TradeStartRe
 		return nil, err
 	}
 	//TODO check is enough funds for any of requested figis?
-	return &dto.TradeStartResponse{Info: "Successfully started"}, nil
+	return &dto.TradeStartResponse{Info: "Successfully started", AlgorithmID: algDm.ID}, nil
 }
 
 func NewTradeProdAPI(infoSrv service.InfoSrv, algFactory strategy.AlgFactory, algRep repository.AlgoRepository,

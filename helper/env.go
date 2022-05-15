@@ -13,8 +13,9 @@ var dbHost string
 var dbPort string
 var dbName string
 
-var srvHost string
 var srvPort string
+
+var logFilePath string
 
 func initEnv() {
 	sanityCheck("TIN_TOKEN")
@@ -29,6 +30,7 @@ func initEnv() {
 	dbName = getOrDefault("DB_NAME", "invest-bot")
 
 	srvPort = getOrDefault("SERVER_PORT", "8017")
+	logFilePath = os.Getenv("LOG_FILE_PATH")
 }
 
 func getOrDefault(env string, def string) string {
@@ -74,8 +76,8 @@ func GetDbName() string {
 	return dbName
 }
 
-func GetSrvHost() string {
-	return srvHost
+func GetLogFilePath() string {
+	return logFilePath
 }
 
 func GetSrvPort() string {

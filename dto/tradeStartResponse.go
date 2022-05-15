@@ -1,5 +1,6 @@
 package dto
 
 type TradeStartResponse struct {
-	Info string
+	Info        string
+	AlgorithmID uint
 }

@@ -18,7 +18,18 @@ func GetContext() *Context {
 }
 
 func init() {
-	logger, _ := zap.NewDevelopment()
+	logConf := zap.NewDevelopmentConfig()
+	if helper.GetLogFilePath() != "" {
+		logConf.OutputPaths = []string{
+			helper.GetLogFilePath(),
+			"stderr",
+		}
+	}
+	logger, err := logConf.Build()
+	if err != nil {
+		log.Panicf("Error setup logger: %s", err)
+	}
+	log.Println("Err: ", err)
 	sugared := logger.Sugar()
 	tapi := tinapi.NewTinApi()
 	infoSdxSrv := service.NewInfoSandboxService(tapi, sugared)
@@ -94,7 +105,7 @@ func (ctx *Context) GetLogger() *zap.SugaredLogger {
 }
 
 func StartBgTasks() {
-	log.Println("Starting background tasks...")
+	ctx.logger.Info("Starting background tasks...")
 	ctx.sdxTrader.Go()
 	ctx.prodTrader.Go()
 }

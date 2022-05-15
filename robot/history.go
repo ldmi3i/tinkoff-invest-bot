@@ -30,6 +30,7 @@ type DefaultHistoryAPI struct {
 }
 
 func (h *DefaultHistoryAPI) LoadHistory(figis []string, ivl investapi.CandleInterval, startTime time.Time, endTime time.Time) error {
+	h.logger.Infof("Load history for figis: %s in interval: %d, From: %s to %s", figis, ivl, startTime, endTime)
 	history, err := h.infoSrv.GetHistorySorted(figis, ivl, startTime, endTime)
 	if err != nil {
 		return err
@@ -37,10 +38,12 @@ func (h *DefaultHistoryAPI) LoadHistory(figis []string, ivl investapi.CandleInte
 	if err = h.histRep.SaveAll(history); err != nil {
 		return err
 	}
+	h.logger.Infof("Load history completed. Loaded %d entries", len(history))
 	return nil
 }
 
 func (h *DefaultHistoryAPI) AnalyzeAlgo(req *dto.CreateAlgorithmRequest) (*dto.HistStatResponse, error) {
+	h.logger.Info("Analyze algorithm request: ", req)
 	algDm := domain.AlgorithmFromDto(req)
 	alg, err := h.aFact.NewHist(algDm)
 	if err != nil {
@@ -54,6 +57,7 @@ func (h *DefaultHistoryAPI) AnalyzeAlgo(req *dto.CreateAlgorithmRequest) (*dto.H
 	if err != nil {
 		return nil, err
 	}
+	h.logger.Info("Analyze algorithm result: ", res)
 	return res, nil
 }
 
@@ -124,10 +128,12 @@ OUT:
 			top = stat
 		}
 	}
-	return &dto.HistStatInRangeResponse{
+	res := &dto.HistStatInRangeResponse{
 		BestRes: top.HistStat,
 		Params:  top.Param,
-	}, nil
+	}
+	h.logger.Info("Analyze algorithm in range completed; Result: ", res)
+	return res, nil
 }
 
 func (h *DefaultHistoryAPI) rangeAnalyzeBg(algRange []stmodel.Algorithm, req *dto.CreateAlgorithmRequest,

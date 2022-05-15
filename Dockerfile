@@ -23,6 +23,15 @@ RUN go build -o ./out/invest-app .
 FROM alpine:3.15
 ARG TEMP=/tmp/invest-app
 COPY --from=build_base $TEMP/out/invest-app /app/invest-app
+RUN mkdir "/opt/log"
+ENV LOG_FILE_PATH="/opt/log/invest-bot.log"
+
+RUN apk update && apk add tzdata
+ENV LANG ru_RU.UTF-8
+ENV LANGUAGE ru_RU:ru
+ENV LC_ALL ru_RU.UTF-8
+ENV TZ=Europe/Moscow
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # Run the binary program produced by `go install`
 CMD ["/app/invest-app"]
