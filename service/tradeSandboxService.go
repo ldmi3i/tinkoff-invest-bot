@@ -11,6 +11,10 @@ type TradeSandboxService struct {
 	logger *zap.SugaredLogger
 }
 
+func (ts *TradeSandboxService) CancelOrder(req *tapi.CancelOrderRequest) (*tapi.CancelOrderResponse, error) {
+	return ts.TinApi.CancelSandboxOrder(req)
+}
+
 func (ts *TradeSandboxService) PostOrder(req *tapi.PostOrderRequest) (*tapi.PostOrderResponse, error) {
 	return ts.TinApi.PostSandboxOrder(req)
 }

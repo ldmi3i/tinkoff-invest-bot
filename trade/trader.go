@@ -43,7 +43,7 @@ func (t *BaseTrader) AddSubscription(sub *stmodel.Subscription) error {
 //Background task to process subscriptions and redirect all of them to single stream
 func (t *BaseTrader) subBg(sub *stmodel.Subscription) {
 	t.logger.Infof("Starting background processing for algo with id: %d", sub.AlgoID)
-	//TODO Add stop channel and select
+	//TODO Add stop channel and select, is stop needed for trader?
 	for req := range sub.AChan {
 		t.logger.Infof("Received algo request: %+v", req)
 		t.algoCh <- req
@@ -72,7 +72,7 @@ func (t *BaseTrader) checkOrdersBg() {
 			case tapi.EXECUTION_REPORT_STATUS_FILL:
 				action.Status = domain.SUCCESS
 				action.Info = "Order successfully completed"
-				action.Amount = state.TotalPrice.Value
+				action.TotalPrice = state.TotalPrice.Value
 				action.Currency = state.TotalPrice.Currency
 				action.PositionPrice = state.AvrPrice.Value
 				action.LotsExecuted = state.LotsExec
@@ -118,6 +118,19 @@ func (t *BaseTrader) checkOrdersBg() {
 					continue
 				}
 				sub.RChan <- &stmodel.ActionResp{Action: action}
+			case tapi.EXECUTION_REPORT_STATUS_PARTIALLYFILL | tapi.EXECUTION_REPORT_STATUS_NEW:
+				if action.ExpirationTime.After(time.Now()) {
+					t.logger.Infof("Canceling order %s by expiration time...", entry.Key)
+					cReq := tapi.CancelOrderRequest{
+						AccountId: action.AccountID,
+						OrderId:   entry.Key,
+					}
+					cResp, err := t.tradeSrv.CancelOrder(&cReq)
+					if err != nil {
+						t.logger.Error("Error while canceling order: ")
+					}
+					t.logger.Info("Order was canceled successfully: ", cResp)
+				}
 			}
 		}
 		time.Sleep(30 * time.Second)
@@ -260,8 +273,13 @@ func (t *BaseTrader) procBuy(opInfo *trmodel.OpInfo, action *domain.Action, sub 
 		PosNum:    lotAmount,
 		Direction: tapi.ORDER_DIRECTION_BUY,
 		AccountId: action.AccountID,
-		OrderType: tapi.ORDER_TYPE_MARKET,
 		OrderId:   orderId,
+	}
+	if action.OrderType == domain.LIMITED && !action.ReqPrice.IsZero() {
+		req.OrderType = tapi.ORDER_TYPE_LIMIT
+		req.InstrPrice = action.ReqPrice
+	} else {
+		req.OrderType = tapi.ORDER_TYPE_MARKET
 	}
 	action.OrderId = orderId
 	order, err := t.tradeSrv.PostOrder(&req)
@@ -273,7 +291,7 @@ func (t *BaseTrader) procBuy(opInfo *trmodel.OpInfo, action *domain.Action, sub 
 	}
 	t.logger.Infof("Posted buy order: %+v", order)
 	//Set amounts of money to action and update action status in db
-	action.Amount = moneyAmount
+	action.TotalPrice = moneyAmount
 	action.LotAmount = lotAmount
 	t.orders.Put(order.OrderId, action)
 	t.setActionStatus(action, domain.POSTED, "Action posted successfully")
@@ -295,8 +313,13 @@ func (t *BaseTrader) procSell(opInfo *trmodel.OpInfo, action *domain.Action, sub
 		PosNum:    action.LotAmount,
 		Direction: tapi.ORDER_DIRECTION_SELL,
 		AccountId: action.AccountID,
-		OrderType: tapi.ORDER_TYPE_MARKET,
 		OrderId:   orderId,
+	}
+	if action.OrderType == domain.LIMITED && !action.ReqPrice.IsZero() {
+		req.OrderType = tapi.ORDER_TYPE_LIMIT
+		req.InstrPrice = action.ReqPrice
+	} else {
+		req.OrderType = tapi.ORDER_TYPE_MARKET
 	}
 	action.OrderId = orderId
 	order, err := t.tradeSrv.PostOrder(&req)

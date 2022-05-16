@@ -113,7 +113,7 @@ func (t *MockTrader) procBuy(opInfo trmodel.OpInfo, action *domain.Action, trDat
 	instrAmount := lotNum.IntPart()
 	trDat.ResInstr[action.InstrFigi] = trDat.ResInstr[action.InstrFigi] + instrAmount
 	trDat.ResAmount[opInfo.Currency] = trDat.ResAmount[opInfo.Currency].Sub(moneyAmount)
-	action.Amount = moneyAmount
+	action.TotalPrice = moneyAmount
 	action.LotAmount = instrAmount
 	action.PositionPrice = opInfo.PosPrice
 	action.LotsExecuted = instrAmount
@@ -134,7 +134,7 @@ func (t *MockTrader) procSell(opInfo trmodel.OpInfo, action *domain.Action, trDa
 	moneyAmount := price.Mul(decimal.NewFromInt(action.LotAmount * opInfo.PosInLot)) //Money amount is a price multiplied by num of positions
 	trDat.ResAmount[opInfo.Currency] = trDat.ResAmount[opInfo.Currency].Add(moneyAmount)
 	trDat.ResInstr[action.InstrFigi] = trDat.ResInstr[action.InstrFigi] - action.LotAmount
-	action.Amount = moneyAmount
+	action.TotalPrice = moneyAmount
 	trDat.SellOper += 1
 	t.sub.RChan <- t.getRespWithStatus(action, domain.SUCCESS)
 }

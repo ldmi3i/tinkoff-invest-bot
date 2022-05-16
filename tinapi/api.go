@@ -25,6 +25,9 @@ type Api interface {
 	PostSandboxOrder(req *tapi.PostOrderRequest) (*tapi.PostOrderResponse, error)
 	PostProdOrder(req *tapi.PostOrderRequest) (*tapi.PostOrderResponse, error)
 
+	CancelSandboxOrder(req *tapi.CancelOrderRequest) (*tapi.CancelOrderResponse, error)
+	CancelProdOrder(req *tapi.CancelOrderRequest) (*tapi.CancelOrderResponse, error)
+
 	GetSandboxOrderState(req *tapi.GetOrderStateRequest) (*tapi.GetOrderStateResponse, error)
 	GetProdOrderState(req *tapi.GetOrderStateRequest) (*tapi.GetOrderStateResponse, error)
 
@@ -172,6 +175,24 @@ func (t *DefaultTinApi) PostProdOrder(req *tapi.PostOrderRequest) (*tapi.PostOrd
 		return nil, err
 	}
 	return tapi.PostOrderResponseToDto(order), nil
+}
+
+func (t *DefaultTinApi) CancelSandboxOrder(req *tapi.CancelOrderRequest) (*tapi.CancelOrderResponse, error) {
+	ctx := contextWithAuth(context.Background())
+	resp, err := t.sandboxCl.CancelSandboxOrder(ctx, req.ToTinApi())
+	if err != nil {
+		return nil, err
+	}
+	return tapi.CancelOrderResponseToDto(resp), nil
+}
+
+func (t *DefaultTinApi) CancelProdOrder(req *tapi.CancelOrderRequest) (*tapi.CancelOrderResponse, error) {
+	ctx := contextWithAuth(context.Background())
+	resp, err := t.orderCl.CancelOrder(ctx, req.ToTinApi())
+	if err != nil {
+		return nil, err
+	}
+	return tapi.CancelOrderResponseToDto(resp), nil
 }
 
 func (t *DefaultTinApi) GetSandboxPositions(req *tapi.PositionsRequest) (*tapi.PositionsResponse, error) {

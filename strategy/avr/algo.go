@@ -8,6 +8,7 @@ import (
 	"invest-robot/repository"
 	"invest-robot/service"
 	"invest-robot/strategy/stmodel"
+	"time"
 )
 
 type AlgorithmImpl struct {
@@ -160,12 +161,15 @@ func (a *AlgorithmImpl) processData(aDat *AlgoData, pDat *procData) {
 			return
 		}
 		action := domain.Action{
-			AlgorithmID: a.id,
-			Direction:   domain.BUY,
-			InstrFigi:   pDat.Figi,
-			Status:      domain.CREATED,
-			RetrievedAt: pDat.Time,
-			AccountID:   a.accountId,
+			AlgorithmID:    a.id,
+			Direction:      domain.BUY,
+			InstrFigi:      pDat.Figi,
+			ReqPrice:       pDat.Price.Mul(decimal.NewFromFloat(0.96)), //TODO extract commission to par!
+			ExpirationTime: time.Now().Add(5 * time.Minute),            //TODO parametrize expiration time!
+			Status:         domain.CREATED,
+			OrderType:      domain.LIMITED,
+			RetrievedAt:    pDat.Time,
+			AccountID:      a.accountId,
 		}
 		a.logger.Infof("Conditions for BUY, requesting action: %+v", action)
 		a.aChan <- a.makeReq(&action)
@@ -183,13 +187,16 @@ func (a *AlgorithmImpl) processData(aDat *AlgoData, pDat *procData) {
 		}
 		if iExists && amount != 0 {
 			action := domain.Action{
-				AlgorithmID: a.id,
-				Direction:   domain.SELL,
-				InstrFigi:   pDat.Figi,
-				LotAmount:   amount,
-				Status:      domain.CREATED,
-				RetrievedAt: pDat.Time,
-				AccountID:   a.accountId,
+				AlgorithmID:    a.id,
+				Direction:      domain.SELL,
+				InstrFigi:      pDat.Figi,
+				LotAmount:      amount,
+				ReqPrice:       pDat.Price.Mul(decimal.NewFromFloat(1.04)), //TODO extract commission to par!
+				ExpirationTime: time.Now().Add(5 * time.Minute),            //TODO parametrize expiration time!
+				Status:         domain.CREATED,
+				OrderType:      domain.LIMITED,
+				RetrievedAt:    pDat.Time,
+				AccountID:      a.accountId,
 			}
 			a.logger.Infof("Conditions for SELL, requesting action: %+v", action)
 			a.aChan <- a.makeReq(&action)

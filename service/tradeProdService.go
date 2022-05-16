@@ -11,6 +11,10 @@ type TradeProdService struct {
 	logger *zap.SugaredLogger
 }
 
+func (ts *TradeProdService) CancelOrder(req *tapi.CancelOrderRequest) (*tapi.CancelOrderResponse, error) {
+	return ts.TinApi.CancelProdOrder(req)
+}
+
 func (ts *TradeProdService) PostOrder(req *tapi.PostOrderRequest) (*tapi.PostOrderResponse, error) {
 	return ts.TinApi.PostProdOrder(req)
 }
