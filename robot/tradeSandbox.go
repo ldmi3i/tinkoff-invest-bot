@@ -18,9 +18,26 @@ type TradeSandboxAPI struct {
 	logger     *zap.SugaredLogger
 }
 
-func (t TradeSandboxAPI) GetActiveAlgorithms() (*dto.ActiveAlgorithmResponse, error) {
-	//TODO implement me
-	panic("implement me")
+func (t *TradeSandboxAPI) GetActiveAlgorithms() (*dto.AlgorithmsResponse, error) {
+	algs, err := t.algFactory.GetSdbxAlgs()
+	if err != nil {
+		t.logger.Error("Error retrieving sandbox algorithms: ", err)
+		return nil, err
+	}
+	res := make([]*dto.AlgorithmResponse, 0, len(algs))
+	for _, alg := range algs {
+		lims := make([]*dto.MoneyValue, 0, len(alg.GetLimits()))
+		for _, lim := range alg.GetLimits() {
+			lims = append(lims, lim.ToDto())
+		}
+		aResp := dto.AlgorithmResponse{
+			AlgorithmID: alg.GetId(),
+			Params:      alg.GetParam(),
+			Limits:      lims,
+		}
+		res = append(res, &aResp)
+	}
+	return &dto.AlgorithmsResponse{Algorithms: res}, nil
 }
 
 func (t TradeSandboxAPI) Trade(req *dto.CreateAlgorithmRequest) (*dto.TradeStartResponse, error) {

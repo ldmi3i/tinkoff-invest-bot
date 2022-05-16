@@ -40,6 +40,13 @@ type MoneyLimit struct {
 	Amount      decimal.Decimal
 }
 
+func (ml *MoneyLimit) ToDto() *dto.MoneyValue {
+	return &dto.MoneyValue{
+		Currency: ml.Currency,
+		Value:    ml.Amount,
+	}
+}
+
 func ParamsToMap(params []*Param) map[string]string {
 	res := make(map[string]string, len(params))
 	for _, param := range params {

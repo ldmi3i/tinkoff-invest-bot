@@ -15,6 +15,7 @@ type Algorithm interface {
 	IsActive() bool
 	GetId() uint
 	GetParam() map[string]string
+	GetLimits() []*domain.MoneyLimit
 	Go() error
 	Stop() error
 }

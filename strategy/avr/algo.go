@@ -217,6 +217,10 @@ func (a *AlgorithmImpl) GetParam() map[string]string {
 	return a.param
 }
 
+func (a *AlgorithmImpl) GetLimits() []*domain.MoneyLimit {
+	return a.limits
+}
+
 func NewProd(algo *domain.Algorithm, infoSrv service.InfoSrv, logger *zap.SugaredLogger) (stmodel.Algorithm, error) {
 	proc, err := newDataProc(algo, infoSrv, logger)
 	if err != nil {

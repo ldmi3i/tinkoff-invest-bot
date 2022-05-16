@@ -6,5 +6,5 @@ import (
 
 type TradeAPI interface {
 	Trade(req *dto.CreateAlgorithmRequest) (*dto.TradeStartResponse, error)
-	GetActiveAlgorithms() (*dto.ActiveAlgorithmResponse, error)
+	GetActiveAlgorithms() (*dto.AlgorithmsResponse, error)
 }

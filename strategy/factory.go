@@ -3,6 +3,7 @@ package strategy
 import (
 	"fmt"
 	"go.uber.org/zap"
+	"invest-robot/collections"
 	"invest-robot/domain"
 	"invest-robot/errors"
 	"invest-robot/repository"
@@ -41,14 +42,37 @@ type AlgFactory interface {
 	NewSandbox(alg *domain.Algorithm) (stmodel.Algorithm, error)
 	NewHist(alg *domain.Algorithm) (stmodel.Algorithm, error)
 	NewRange(alg *domain.Algorithm) ([]stmodel.Algorithm, error)
+	GetProdAlgs() ([]stmodel.Algorithm, error)
+	GetSdbxAlgs() ([]stmodel.Algorithm, error)
 }
 
 type DefaultAlgFactory struct {
-	hRep        repository.HistoryRepository
-	infoSdxSrv  service.InfoSrv
-	infoProdSrv service.InfoSrv
-	cache       map[uint]*stmodel.Algorithm
-	logger      *zap.SugaredLogger
+	hRep           repository.HistoryRepository
+	infoSdxSrv     service.InfoSrv
+	infoProdSrv    service.InfoSrv
+	prodAlgorithms collections.SyncMap[uint, stmodel.Algorithm]
+	sdbxAlgorithms collections.SyncMap[uint, stmodel.Algorithm]
+	logger         *zap.SugaredLogger
+}
+
+func (a *DefaultAlgFactory) GetProdAlgs() ([]stmodel.Algorithm, error) {
+	res := make([]stmodel.Algorithm, 0)
+	for _, entry := range a.prodAlgorithms.GetSlice() {
+		if entry.Value.IsActive() {
+			res = append(res, entry.Value)
+		}
+	}
+	return res, nil
+}
+
+func (a *DefaultAlgFactory) GetSdbxAlgs() ([]stmodel.Algorithm, error) {
+	res := make([]stmodel.Algorithm, 0)
+	for _, entry := range a.sdbxAlgorithms.GetSlice() {
+		if entry.Value.IsActive() {
+			res = append(res, entry.Value)
+		}
+	}
+	return res, nil
 }
 
 func (a *DefaultAlgFactory) NewProd(alg *domain.Algorithm) (stmodel.Algorithm, error) {
@@ -59,18 +83,27 @@ func (a *DefaultAlgFactory) NewProd(alg *domain.Algorithm) (stmodel.Algorithm, e
 			fmt.Sprintf("Algorithm '%s' does not exist - add mapping to strategy.factory.algMapping", alg.Strategy),
 		)
 	}
-	return factory.algProd(alg, a.infoSdxSrv, a.logger)
+	res, err := factory.algProd(alg, a.infoSdxSrv, a.logger)
+	if err == nil {
+		a.prodAlgorithms.Put(alg.ID, res)
+	}
+	return res, err
 }
 
 func (a *DefaultAlgFactory) NewSandbox(alg *domain.Algorithm) (stmodel.Algorithm, error) {
 	a.logger.Infof("Creating new SANDBOX algorithm with strategy: %s and params: %+v", alg.Strategy, alg.Params)
 	factory, exist := algMapping[alg.Strategy]
 	if !exist {
+		a.logger.Error("No mapping for requested algorithm strategy ", alg.Strategy)
 		return nil, errors.NewUnexpectedError(
 			fmt.Sprintf("Algorithm '%s' does not exist - add mapping to strategy.factory.algMapping", alg.Strategy),
 		)
 	}
-	return factory.algSandbox(alg, a.infoSdxSrv, a.logger)
+	res, err := factory.algSandbox(alg, a.infoSdxSrv, a.logger)
+	if err == nil {
+		a.sdbxAlgorithms.Put(alg.ID, res)
+	}
+	return res, err
 }
 
 func (a *DefaultAlgFactory) NewHist(alg *domain.Algorithm) (stmodel.Algorithm, error) {
@@ -121,10 +154,11 @@ func NewAlgFactory(infoSdxSrv service.InfoSrv, infoProdSrv service.InfoSrv, rep 
 	initialize(logger)
 
 	return &DefaultAlgFactory{
-		hRep:        rep,
-		infoSdxSrv:  infoSdxSrv,
-		infoProdSrv: infoProdSrv,
-		cache:       make(map[uint]*stmodel.Algorithm),
-		logger:      logger,
+		hRep:           rep,
+		infoSdxSrv:     infoSdxSrv,
+		infoProdSrv:    infoProdSrv,
+		prodAlgorithms: collections.NewSyncMap[uint, stmodel.Algorithm](),
+		sdbxAlgorithms: collections.NewSyncMap[uint, stmodel.Algorithm](),
+		logger:         logger,
 	}
 }

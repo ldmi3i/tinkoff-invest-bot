@@ -11,6 +11,8 @@ import (
 type TradeHandler interface {
 	TradeSandbox(c *gin.Context)
 	TradeProd(c *gin.Context)
+	GetSdbxAlgorithms(c *gin.Context)
+	GetProdAlgorithms(c *gin.Context)
 }
 
 type DefaultTradeHandler struct {
@@ -46,4 +48,28 @@ func (h *DefaultTradeHandler) trade(c *gin.Context, api robot.TradeAPI) {
 		return
 	}
 	c.JSON(http.StatusOK, stat)
+}
+
+func (h *DefaultTradeHandler) GetSdbxAlgorithms(c *gin.Context) {
+	h.logger.Info("GetProdAlgorithms sandbox requested")
+	algos, err := h.sandboxApi.GetActiveAlgorithms()
+	if err != nil {
+		h.logger.Errorf("Error retrieving active algorithms:\n%s", err)
+		c.JSON(http.StatusInternalServerError, err.Error())
+		return
+	}
+	h.logger.Infof("GetProdAlgorithms sandbox returns %d results", len(algos.Algorithms))
+	c.JSON(http.StatusOK, algos)
+}
+
+func (h *DefaultTradeHandler) GetProdAlgorithms(c *gin.Context) {
+	h.logger.Info("GetProdAlgorithms prod requested")
+	algos, err := h.prodApi.GetActiveAlgorithms()
+	if err != nil {
+		h.logger.Errorf("Error retrieving active algorithms:\n%s", err)
+		c.JSON(http.StatusInternalServerError, err.Error())
+		return
+	}
+	h.logger.Infof("GetProdAlgorithms prod returns %d results", len(algos.Algorithms))
+	c.JSON(http.StatusOK, algos)
 }
