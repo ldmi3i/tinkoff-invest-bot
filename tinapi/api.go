@@ -95,7 +95,7 @@ func (t *DefaultTinApi) GetHistorySorted(figis []string, ivl investapi.CandleInt
 func contextWithAuth(ctx context.Context) context.Context {
 	md := metadata.New(map[string]string{
 		"Authorization": "Bearer " + helper.GetTinToken(),
-		"x-app-name":    "ldmi3i:invest-bot",
+		"x-app-name":    "ldmi3i",
 	})
 	return metadata.NewOutgoingContext(ctx, md)
 }
