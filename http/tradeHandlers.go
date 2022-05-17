@@ -13,6 +13,7 @@ type TradeHandler interface {
 	TradeProd(c *gin.Context)
 	GetSdbxAlgorithms(c *gin.Context)
 	GetProdAlgorithms(c *gin.Context)
+	StopAlgorithm(c *gin.Context)
 }
 
 type DefaultTradeHandler struct {
@@ -23,6 +24,23 @@ type DefaultTradeHandler struct {
 
 func NewTradeHandler(sandboxApi robot.TradeAPI, prodApi robot.TradeAPI, logger *zap.SugaredLogger) TradeHandler {
 	return &DefaultTradeHandler{sandboxApi, prodApi, logger}
+}
+
+func (h *DefaultTradeHandler) StopAlgorithm(c *gin.Context) {
+	var req dto.StopAlgorithmRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		h.logger.Errorf("Error while validating Stop Algorithm request:\n%s", err)
+		c.JSON(http.StatusBadRequest, err.Error())
+		return
+	}
+	h.logger.Infof("Start sandbox trading: %+v", req)
+	stat, err := h.prodApi.StopAlgorithm(&req)
+	if err != nil {
+		h.logger.Errorf("Error while stopping algorithm:\n%s", err)
+		c.JSON(http.StatusInternalServerError, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, stat)
 }
 
 func (h *DefaultTradeHandler) TradeSandbox(c *gin.Context) {

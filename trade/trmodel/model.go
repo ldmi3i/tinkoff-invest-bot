@@ -5,8 +5,9 @@ import (
 )
 
 type OpInfo struct {
-	PosInLot int64
-	PosPrice decimal.Decimal
-	Lim      decimal.Decimal
-	Currency string
+	PosInLot  int64
+	PosPrice  decimal.Decimal
+	Lim       decimal.Decimal
+	PriceStep decimal.Decimal
+	Currency  string
 }

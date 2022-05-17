@@ -11,6 +11,7 @@ import (
 )
 
 type TradeSandboxAPI struct {
+	*BaseTradeAPI
 	infoSrv    service.InfoSrv
 	algFactory strategy.AlgFactory
 	algRep     repository.AlgoRepository
@@ -26,16 +27,7 @@ func (t *TradeSandboxAPI) GetActiveAlgorithms() (*dto.AlgorithmsResponse, error)
 	}
 	res := make([]*dto.AlgorithmResponse, 0, len(algs))
 	for _, alg := range algs {
-		lims := make([]*dto.MoneyValue, 0, len(alg.GetLimits()))
-		for _, lim := range alg.GetLimits() {
-			lims = append(lims, lim.ToDto())
-		}
-		aResp := dto.AlgorithmResponse{
-			AlgorithmID: alg.GetId(),
-			Params:      alg.GetParam(),
-			Limits:      lims,
-		}
-		res = append(res, &aResp)
+		res = append(res, alg.GetAlgorithm().ToDto())
 	}
 	return &dto.AlgorithmsResponse{Algorithms: res}, nil
 }
@@ -67,5 +59,6 @@ func (t TradeSandboxAPI) Trade(req *dto.CreateAlgorithmRequest) (*dto.TradeStart
 
 func NewSandboxTradeAPI(infoSrv service.InfoSrv, algFactory strategy.AlgFactory, algRep repository.AlgoRepository,
 	trader trade.Trader, logger *zap.SugaredLogger) TradeAPI {
-	return &TradeSandboxAPI{infoSrv, algFactory, algRep, trader, logger}
+	baseAPI := BaseTradeAPI{algFactory: algFactory, logger: logger}
+	return &TradeSandboxAPI{&baseAPI, infoSrv, algFactory, algRep, trader, logger}
 }

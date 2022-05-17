@@ -19,6 +19,24 @@ type Algorithm struct {
 	IsActive    bool
 }
 
+func (alg *Algorithm) ToDto() *dto.AlgorithmResponse {
+	limits := make([]*dto.MoneyValue, 0, len(alg.MoneyLimits))
+	for _, lim := range alg.MoneyLimits {
+		limits = append(limits, lim.ToDto())
+	}
+	return &dto.AlgorithmResponse{
+		AlgorithmID: alg.ID,
+		Strategy:    alg.Strategy,
+		AccountId:   alg.AccountId,
+		Figis:       alg.Figis,
+		MoneyLimits: limits,
+		Params:      ParamsToMap(alg.Params),
+		IsActive:    alg.IsActive,
+		CreatedAt:   alg.CreatedAt,
+		UpdatedAt:   alg.UpdatedAt,
+	}
+}
+
 type Param struct {
 	ID          uint `gorm:"primaryKey"`
 	AlgorithmID uint

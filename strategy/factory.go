@@ -44,6 +44,7 @@ type AlgFactory interface {
 	NewRange(alg *domain.Algorithm) ([]stmodel.Algorithm, error)
 	GetProdAlgs() ([]stmodel.Algorithm, error)
 	GetSdbxAlgs() ([]stmodel.Algorithm, error)
+	GetAlgorithmById(algoId uint) (stmodel.Algorithm, bool)
 }
 
 type DefaultAlgFactory struct {
@@ -53,6 +54,21 @@ type DefaultAlgFactory struct {
 	prodAlgorithms collections.SyncMap[uint, stmodel.Algorithm]
 	sdbxAlgorithms collections.SyncMap[uint, stmodel.Algorithm]
 	logger         *zap.SugaredLogger
+}
+
+func (a *DefaultAlgFactory) GetAlgorithmById(algoId uint) (stmodel.Algorithm, bool) {
+	res, ok := a.prodAlgorithms.Get(algoId)
+	if ok {
+		return res, true
+	} else {
+		res, ok = a.sdbxAlgorithms.Get(algoId)
+		if ok {
+			return res, true
+		} else {
+			a.logger.Infof("Algorithm by id %d not found", algoId)
+			return nil, false
+		}
+	}
 }
 
 func (a *DefaultAlgFactory) GetProdAlgs() ([]stmodel.Algorithm, error) {

@@ -31,7 +31,7 @@ func init() {
 	}
 	log.Println("Err: ", err)
 	sugared := logger.Sugar()
-	tapi := tinapi.NewTinApi()
+	tapi := tinapi.NewTinApi(sugared)
 	infoSdxSrv := service.NewInfoSandboxService(tapi, sugared)
 	infoProdSrv := service.NewInfoProdService(tapi, sugared)
 	tradeSdxSrv := service.NewTradeSandboxSrv(tapi, sugared)
@@ -120,4 +120,12 @@ func StartBgTasks() {
 	ctx.logger.Info("Starting background tasks...")
 	ctx.sdxTrader.Go()
 	ctx.prodTrader.Go()
+}
+
+func PostProcess() {
+	ctx.logger.Info("Sync logs")
+	err := ctx.logger.Sync()
+	if err != nil {
+		return
+	}
 }

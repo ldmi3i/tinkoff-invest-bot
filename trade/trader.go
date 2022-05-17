@@ -68,8 +68,14 @@ func (t *BaseTrader) checkOrdersBg() {
 				continue
 			}
 			t.logger.Info("Check order with id ", entry.Key, " status ", state.ExecStatus)
+			sub, ok := t.subs.Get(action.AlgorithmID)
+			if !ok {
+				t.logger.Warn("Subscription by id ", action.ID, " not found")
+				t.orders.Delete(entry.Key)
+				continue
+			}
 			switch state.ExecStatus {
-			case tapi.EXECUTION_REPORT_STATUS_FILL:
+			case tapi.ExecutionReportStatusFill:
 				action.Status = domain.SUCCESS
 				action.Info = "Order successfully completed"
 				action.TotalPrice = state.TotalPrice.Value
@@ -82,13 +88,8 @@ func (t *BaseTrader) checkOrdersBg() {
 				}
 				t.orders.Delete(entry.Key)
 				t.logger.Info("Order with id ", entry.Key, " completed")
-				sub, ok := t.subs.Get(action.AlgorithmID)
-				if !ok {
-					t.logger.Warn("Subscription by id ", action.ID, " not found")
-					continue
-				}
 				sub.RChan <- &stmodel.ActionResp{Action: action}
-			case tapi.EXECUTION_REPORT_STATUS_REJECTED:
+			case tapi.ExecutionReportStatusRejected:
 				action.Status = domain.FAILED
 				action.Info = "Order was rejected"
 				err = t.actionRep.Save(action)
@@ -97,13 +98,8 @@ func (t *BaseTrader) checkOrdersBg() {
 				}
 				t.orders.Delete(entry.Key)
 				t.logger.Infof("Order with id %s rejected", entry.Key)
-				sub, ok := t.subs.Get(action.ID)
-				if !ok {
-					t.logger.Warnf("Subscription by id %d not found", action.ID)
-					continue
-				}
 				sub.RChan <- &stmodel.ActionResp{Action: action}
-			case tapi.EXECUTION_REPORT_STATUS_CANCELLED:
+			case tapi.ExecutionReportStatusCancelled:
 				action.Status = domain.FAILED
 				action.Info = "Order was canceled"
 				err = t.actionRep.Save(action)
@@ -112,14 +108,10 @@ func (t *BaseTrader) checkOrdersBg() {
 				}
 				t.orders.Delete(entry.Key)
 				t.logger.Infof("Order with id %s rejected", entry.Key)
-				sub, ok := t.subs.Get(action.ID)
-				if !ok {
-					t.logger.Warnf("Subscription by id %d not found", action.ID)
-					continue
-				}
 				sub.RChan <- &stmodel.ActionResp{Action: action}
-			case tapi.EXECUTION_REPORT_STATUS_PARTIALLYFILL | tapi.EXECUTION_REPORT_STATUS_NEW:
-				if action.ExpirationTime.After(time.Now()) {
+			case tapi.ExecutionReportStatusPartiallyfill, tapi.ExecutionReportStatusNew:
+				t.logger.Debugf("Check expiration time  %s, %s", action.ExpirationTime, time.Now())
+				if action.ExpirationTime.Before(time.Now()) {
 					t.logger.Infof("Canceling order %s by expiration time...", entry.Key)
 					cReq := tapi.CancelOrderRequest{
 						AccountId: action.AccountID,
@@ -128,8 +120,13 @@ func (t *BaseTrader) checkOrdersBg() {
 					cResp, err := t.tradeSrv.CancelOrder(&cReq)
 					if err != nil {
 						t.logger.Error("Error while canceling order: ")
+						continue
 					}
+					t.orders.Delete(entry.Key)
 					t.logger.Info("Order was canceled successfully: ", cResp)
+					action.Status = domain.FAILED
+					action.Info = "Order was canceled"
+					sub.RChan <- &stmodel.ActionResp{Action: action}
 				}
 			}
 		}
@@ -209,7 +206,7 @@ func (t *BaseTrader) preprocessAction(req *stmodel.ActionReq, subscription *stmo
 		return nil, false
 	}
 	opInfo := trmodel.OpInfo{
-		Currency: action.Currency, Lim: req.GetCurrLimit(action.Currency), PosInLot: instrInfo.Lot}
+		Currency: action.Currency, Lim: req.GetCurrLimit(action.Currency), PosInLot: instrInfo.Lot, PriceStep: instrInfo.MinPriceIncrement}
 	if opInfo.Lim.IsZero() {
 		t.logger.Warnf("Limit for currency %s not set, discarding order", action.Currency)
 		t.setActionStatus(action, domain.FAILED, "Limit by requested currency not set")
@@ -242,11 +239,11 @@ func (t *BaseTrader) procBuy(opInfo *trmodel.OpInfo, action *domain.Action, sub 
 		sub.RChan <- &stmodel.ActionResp{Action: action}
 		return
 	}
-	//Calculate number of weighted instruments possible to buy for existing limit
+	//Calculate number of weighted instruments available to buy for existing limit
 	operNum := opInfo.Lim.Div(lotPrice).Floor()
 	//Calculate required amount of money for this order
 	moneyAmount := operNum.Mul(lotPrice)
-	//Calculate instrument amount to buy
+	//Set instrument amount to buy
 	lotAmount := operNum.IntPart()
 	//Get real available money amount using GetPositions request
 	posReq := tapi.PositionsRequest{AccountId: action.AccountID}
@@ -277,14 +274,14 @@ func (t *BaseTrader) procBuy(opInfo *trmodel.OpInfo, action *domain.Action, sub 
 	}
 	if action.OrderType == domain.LIMITED && !action.ReqPrice.IsZero() {
 		req.OrderType = tapi.ORDER_TYPE_LIMIT
-		req.InstrPrice = action.ReqPrice
+		req.InstrPrice = t.normalizePriceDown(action.ReqPrice, opInfo.PriceStep)
 	} else {
 		req.OrderType = tapi.ORDER_TYPE_MARKET
 	}
 	action.OrderId = orderId
 	order, err := t.tradeSrv.PostOrder(&req)
 	if err != nil {
-		t.logger.Errorf("Error posting buy order %s: %s", orderId, err)
+		t.logger.Errorf("Error posting sell order %+v: %s, response: %v", req, err, order)
 		t.setActionStatus(action, domain.FAILED, "Error while posting buy order")
 		sub.RChan <- &stmodel.ActionResp{Action: action}
 		return
@@ -317,14 +314,14 @@ func (t *BaseTrader) procSell(opInfo *trmodel.OpInfo, action *domain.Action, sub
 	}
 	if action.OrderType == domain.LIMITED && !action.ReqPrice.IsZero() {
 		req.OrderType = tapi.ORDER_TYPE_LIMIT
-		req.InstrPrice = action.ReqPrice
+		req.InstrPrice = t.normalizePriceUp(action.ReqPrice, opInfo.PriceStep)
 	} else {
 		req.OrderType = tapi.ORDER_TYPE_MARKET
 	}
 	action.OrderId = orderId
 	order, err := t.tradeSrv.PostOrder(&req)
 	if err != nil {
-		t.logger.Errorf("Error posting sell order %s: %s", orderId, err)
+		t.logger.Errorf("Error posting sell order %+v: %s, response: %v", req, err, order)
 		t.setActionStatus(action, domain.FAILED, "Error while posting buy order")
 		sub.RChan <- &stmodel.ActionResp{Action: action}
 		return
@@ -333,6 +330,21 @@ func (t *BaseTrader) procSell(opInfo *trmodel.OpInfo, action *domain.Action, sub
 	t.orders.Put(order.OrderId, action)
 	t.logger.Info("Posted sell order ", order)
 	t.setActionStatus(action, domain.POSTED, "Sell order successfully posted")
+}
+
+//normalization required to take into account price step of instrument
+func (t *BaseTrader) normalizePriceUp(price decimal.Decimal, priceStep decimal.Decimal) decimal.Decimal {
+	if price.Mod(priceStep) != decimal.Zero {
+		return price.Div(priceStep).Ceil().Mul(priceStep)
+	}
+	return price
+}
+
+func (t *BaseTrader) normalizePriceDown(price decimal.Decimal, priceStep decimal.Decimal) decimal.Decimal {
+	if price.Mod(priceStep) != decimal.Zero {
+		return price.Div(priceStep).Floor().Mul(priceStep)
+	}
+	return price
 }
 
 //Set status and info message to action and updates it in db

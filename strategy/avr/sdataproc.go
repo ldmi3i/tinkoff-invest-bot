@@ -6,7 +6,6 @@ import (
 	"invest-robot/collections"
 	"invest-robot/convert"
 	"invest-robot/domain"
-	"invest-robot/errors"
 	"invest-robot/service"
 	investapi "invest-robot/tapigen"
 	"io"
@@ -15,15 +14,16 @@ import (
 )
 
 type DataProcProd struct {
-	stream  investapi.MarketDataStreamService_MarketDataStreamClient
-	algo    *domain.Algorithm
-	infoSrv service.InfoSrv
-	algoId  uint
-	params  map[string]string
-	figis   []string
-	stopCh  chan bool
-	dtCh    chan procData
-	trackId string
+	stream   investapi.MarketDataStreamService_MarketDataStreamClient
+	algo     *domain.Algorithm
+	infoSrv  service.InfoSrv
+	algoId   uint
+	params   map[string]string
+	figis    []string
+	stopCh   chan bool
+	dtCh     chan procData
+	origDtCh chan *investapi.MarketDataResponse
+	trackId  string
 
 	longDur int
 	savMap  map[string]*collections.TList[decimal.Decimal]
@@ -73,52 +73,78 @@ func (d *DataProcProd) procBg() {
 		d.logger.Errorf("Error while subsribing to candles, id %d: %s", d.algoId, err)
 		return
 	}
+	go d.processDataInBg()
+OUT:
+	for {
+		select {
+		case cDat, ok := <-d.origDtCh:
+			if !ok {
+				d.logger.Info("Data channel closed, breaking data processor cycle...")
+				break OUT
+			}
+			candle := cDat.GetCandle()
+			if candle == nil {
+				if cDat.GetPing() == nil {
+					d.logger.Infof("Received nil candle, id: %d, tracking id: %s, full response: %+v", d.algoId, d.trackId, cDat)
+				}
+				continue
+			}
+			savL, ok := d.savMap[candle.Figi]
+			if !ok {
+				d.logger.Infof("WARN received figi that not presented in listening list, id: %d", d.algoId)
+			}
+			lavL := d.lavMap[candle.Figi]
+			price := convert.QuotationToDec(candle.Close)
+			dTime := candle.Time.AsTime()
+			savL.Append(price, dTime)
+			lavL.Append(price, dTime)
+
+			sav, err := calcAvg(savL)
+			if err != nil {
+				d.logger.Errorf("Error while calculating short average %d: %s", d.algoId, err)
+				break
+			}
+			lav, err := calcAvg(lavL)
+			if err != nil {
+				d.logger.Errorf("Error while calculating long average %d: %s", d.algoId, err)
+				break
+			}
+			dat := procData{
+				Figi:  candle.Figi,
+				Time:  dTime,
+				LAV:   *lav,
+				SAV:   *sav,
+				Price: price,
+			}
+			d.logger.Debugf("Sending data for alg %d: %+v", d.algoId, dat)
+			d.dtCh <- dat
+		case <-d.stopCh:
+			d.logger.Info("Stop signal received, breaking cycle...")
+			break OUT
+		}
+	}
+	err = d.unsubscribe()
+	if err != nil {
+		d.logger.Errorf("Error while unsubscribing to candles, id %d: %s", d.algoId, err)
+	}
+}
+
+func (d *DataProcProd) processDataInBg() {
+	defer func() {
+		d.logger.Info("Closing tin API data channel...")
+		close(d.origDtCh)
+	}()
 	for {
 		cDat, err := d.stream.Recv()
 		if err == io.EOF {
 			d.logger.Info("Received end of stream...")
-			err := d.unsubscribe()
-			if err != nil {
-				d.logger.Errorf("Error while unsubscribing to candles, id %d: %s", d.algoId, err)
-			}
 			return
 		}
-		candle := cDat.GetCandle()
-		if candle == nil {
-			if cDat.GetPing() == nil {
-				d.logger.Infof("Received nil candle, id: %d, tracking id: %s, full response: %+v", d.algoId, d.trackId, cDat)
-			}
+		if err != nil {
+			d.logger.Warn("Error while getting stream data...", err)
 			continue
 		}
-		savL, ok := d.savMap[candle.Figi]
-		if !ok {
-			d.logger.Infof("WARN received figi that not presented in listening list, id: %d", d.algoId)
-		}
-		lavL := d.lavMap[candle.Figi]
-		price := convert.QuotationToDec(candle.Close)
-		dTime := candle.Time.AsTime()
-		savL.Append(price, dTime)
-		lavL.Append(price, dTime)
-
-		sav, err := calcAvg(savL)
-		if err != nil {
-			d.logger.Errorf("Error while calculating short average %d: %s", d.algoId, err)
-			break
-		}
-		lav, err := calcAvg(lavL)
-		if err != nil {
-			d.logger.Errorf("Error while calculating long average %d: %s", d.algoId, err)
-			break
-		}
-		dat := procData{
-			Figi:  candle.Figi,
-			Time:  dTime,
-			LAV:   *lav,
-			SAV:   *sav,
-			Price: price,
-		}
-		d.logger.Debugf("Sending data for alg %d: %+v", d.algoId, dat)
-		d.dtCh <- dat
+		d.origDtCh <- cDat
 	}
 }
 
@@ -197,20 +223,24 @@ func (d *DataProcProd) unsubscribe() error {
 }
 
 func (d *DataProcProd) Stop() error {
-	return errors.NewNotImplemented()
+	d.logger.Info("Stopping data processor...")
+	d.stopCh <- true
+	d.logger.Info("Stop signal send")
+	return nil
 }
 
 func newDataProc(req *domain.Algorithm, infoSrv service.InfoSrv, logger *zap.SugaredLogger) (DataProc, error) {
 	return &DataProcProd{
-		algo:    req,
-		infoSrv: infoSrv,
-		algoId:  req.ID,
-		params:  domain.ParamsToMap(req.Params),
-		figis:   req.Figis,
-		stopCh:  make(chan bool, 1),
-		dtCh:    make(chan procData),
-		savMap:  make(map[string]*collections.TList[decimal.Decimal]),
-		lavMap:  make(map[string]*collections.TList[decimal.Decimal]),
-		logger:  logger,
+		algo:     req,
+		infoSrv:  infoSrv,
+		algoId:   req.ID,
+		params:   domain.ParamsToMap(req.Params),
+		figis:    req.Figis,
+		stopCh:   make(chan bool, 1),
+		dtCh:     make(chan procData),
+		origDtCh: make(chan *investapi.MarketDataResponse),
+		savMap:   make(map[string]*collections.TList[decimal.Decimal]),
+		lavMap:   make(map[string]*collections.TList[decimal.Decimal]),
+		logger:   logger,
 	}, nil
 }

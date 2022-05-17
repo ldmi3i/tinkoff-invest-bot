@@ -41,6 +41,7 @@ func tradeHandlers(router *gin.Engine, ctx *robot.Context) {
 
 	router.GET("/trade/algorithms/active/prod", th.GetProdAlgorithms)
 	router.GET("/trade/algorithms/active/sandbox", th.GetSdbxAlgorithms)
+	router.POST("/trade/algorithms/stop", th.StopAlgorithm)
 }
 
 func statHandlers(router *gin.Engine, ctx *robot.Context) {

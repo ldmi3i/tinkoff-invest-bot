@@ -8,21 +8,26 @@ import (
 	"invest-robot/repository"
 	"invest-robot/service"
 	"invest-robot/strategy/stmodel"
+	"strconv"
 	"time"
 )
 
 type AlgorithmImpl struct {
-	id        uint
-	isActive  bool
-	dataProc  DataProc
-	accountId string
-	figis     []string
-	limits    []*domain.MoneyLimit
-	param     map[string]string
-	aChan     chan *stmodel.ActionReq
-	arChan    chan *stmodel.ActionResp
-	buyPrice  map[string]decimal.Decimal
-	limWidth  decimal.Decimal
+	id         uint
+	isActive   bool
+	dataProc   DataProc
+	accountId  string
+	figis      []string
+	limits     []*domain.MoneyLimit
+	algorithm  *domain.Algorithm
+	param      map[string]string
+	aChan      chan *stmodel.ActionReq
+	arChan     chan *stmodel.ActionResp
+	stopCh     chan bool
+	buyPrice   map[string]decimal.Decimal
+	limWidth   decimal.Decimal
+	ordExp     time.Duration
+	commission decimal.Decimal
 
 	logger *zap.SugaredLogger
 }
@@ -39,7 +44,9 @@ const (
 )
 
 const (
-	tradeLimWidth string = "limWidth"
+	tradeLimWidth   string = "limWidth"
+	OrderExpiration string = "order_expiration"
+	Commission      string = "order_commission"
 )
 
 type AlgoData struct {
@@ -111,6 +118,9 @@ func (a *AlgorithmImpl) procBg(datCh <-chan procData) {
 				a.logger.Infof("Closed data processor stream, stopping algorithm...")
 				return
 			}
+		case <-a.stopCh:
+			a.logger.Info("Stop signal received, stopping bg task algorithm...")
+			return
 		}
 	}
 }
@@ -164,8 +174,8 @@ func (a *AlgorithmImpl) processData(aDat *AlgoData, pDat *procData) {
 			AlgorithmID:    a.id,
 			Direction:      domain.BUY,
 			InstrFigi:      pDat.Figi,
-			ReqPrice:       pDat.Price.Mul(decimal.NewFromFloat(0.96)), //TODO extract commission to par!
-			ExpirationTime: time.Now().Add(5 * time.Minute),            //TODO parametrize expiration time!
+			ReqPrice:       pDat.Price.Mul(decimal.NewFromInt(1).Sub(a.commission)),
+			ExpirationTime: time.Now().Add(a.ordExp),
 			Status:         domain.CREATED,
 			OrderType:      domain.LIMITED,
 			RetrievedAt:    pDat.Time,
@@ -191,8 +201,8 @@ func (a *AlgorithmImpl) processData(aDat *AlgoData, pDat *procData) {
 				Direction:      domain.SELL,
 				InstrFigi:      pDat.Figi,
 				LotAmount:      amount,
-				ReqPrice:       pDat.Price.Mul(decimal.NewFromFloat(1.04)), //TODO extract commission to par!
-				ExpirationTime: time.Now().Add(5 * time.Minute),            //TODO parametrize expiration time!
+				ReqPrice:       pDat.Price.Mul(decimal.NewFromInt(1).Sub(a.commission)),
+				ExpirationTime: time.Now().Add(a.ordExp),
 				Status:         domain.CREATED,
 				OrderType:      domain.LIMITED,
 				RetrievedAt:    pDat.Time,
@@ -213,7 +223,19 @@ func (a *AlgorithmImpl) makeReq(action *domain.Action) *stmodel.ActionReq {
 }
 
 func (a *AlgorithmImpl) Stop() error {
-	return errors.NewNotImplemented()
+	if !a.isActive {
+		a.logger.Info("Algorithm already stopped, do nothing...")
+		return nil
+	}
+	a.logger.Info("Stopping algorithm: ", a.algorithm)
+	a.stopCh <- true
+	err := a.dataProc.Stop()
+	if err != nil {
+		a.logger.Error("Algorithm stopped, but data processor exit with error!")
+		return err
+	}
+	a.logger.Infof("Algorithm %d successfully stopped", a.algorithm.ID)
+	return nil
 }
 
 func (a *AlgorithmImpl) Configure(ctx []domain.CtxParam) error {
@@ -222,6 +244,10 @@ func (a *AlgorithmImpl) Configure(ctx []domain.CtxParam) error {
 
 func (a *AlgorithmImpl) GetParam() map[string]string {
 	return a.param
+}
+
+func (a *AlgorithmImpl) GetAlgorithm() *domain.Algorithm {
+	return a.algorithm
 }
 
 func (a *AlgorithmImpl) GetLimits() []*domain.MoneyLimit {
@@ -245,17 +271,22 @@ func NewProd(algo *domain.Algorithm, infoSrv service.InfoSrv, logger *zap.Sugare
 	} else {
 		limWidth = decimal.NewFromFloat(0.01)
 	}
+	ordExpInt := getOrDefaultInt(paramMap, OrderExpiration, 300)
 	return &AlgorithmImpl{
-		id:        algo.ID,
-		isActive:  true,
-		accountId: algo.AccountId,
-		dataProc:  proc,
-		figis:     algo.Figis,
-		limits:    algo.MoneyLimits,
-		param:     paramMap,
-		buyPrice:  make(map[string]decimal.Decimal),
-		logger:    logger,
-		limWidth:  limWidth,
+		id:         algo.ID,
+		isActive:   true,
+		accountId:  algo.AccountId,
+		dataProc:   proc,
+		figis:      algo.Figis,
+		limits:     algo.MoneyLimits,
+		param:      paramMap,
+		algorithm:  algo,
+		buyPrice:   make(map[string]decimal.Decimal),
+		stopCh:     make(chan bool),
+		logger:     logger,
+		limWidth:   limWidth,
+		ordExp:     time.Duration(ordExpInt) * time.Second,
+		commission: getOrDefaultDecimal(paramMap, Commission, decimal.NewFromFloat(0.05)).Div(decimal.NewFromInt(100)),
 	}, nil
 }
 
@@ -276,17 +307,22 @@ func NewSandbox(algo *domain.Algorithm, infoSrv service.InfoSrv, logger *zap.Sug
 	} else {
 		limWidth = decimal.NewFromFloat(0.01)
 	}
+	ordExpInt := getOrDefaultInt(paramMap, OrderExpiration, 300)
 	return &AlgorithmImpl{
-		id:        algo.ID,
-		isActive:  true,
-		accountId: algo.AccountId,
-		dataProc:  proc,
-		figis:     algo.Figis,
-		limits:    algo.MoneyLimits,
-		param:     paramMap,
-		buyPrice:  make(map[string]decimal.Decimal),
-		logger:    logger,
-		limWidth:  limWidth,
+		id:         algo.ID,
+		isActive:   true,
+		accountId:  algo.AccountId,
+		dataProc:   proc,
+		figis:      algo.Figis,
+		limits:     algo.MoneyLimits,
+		param:      paramMap,
+		algorithm:  algo,
+		buyPrice:   make(map[string]decimal.Decimal),
+		stopCh:     make(chan bool),
+		logger:     logger,
+		limWidth:   limWidth,
+		ordExp:     time.Duration(ordExpInt) * time.Second,
+		commission: getOrDefaultDecimal(paramMap, Commission, decimal.NewFromFloat(0.05)).Div(decimal.NewFromInt(100)),
 	}, nil
 }
 
@@ -309,16 +345,47 @@ func NewHist(algo *domain.Algorithm, hRep repository.HistoryRepository, rootLogg
 	} else {
 		limWidth = decimal.NewFromFloat(0.01)
 	}
+	ordExpInt := getOrDefaultInt(paramMap, OrderExpiration, 300)
 	return &AlgorithmImpl{
-		id:        algo.ID,
-		isActive:  true,
-		accountId: algo.AccountId,
-		dataProc:  proc,
-		figis:     algo.Figis,
-		limits:    algo.MoneyLimits,
-		param:     paramMap,
-		buyPrice:  make(map[string]decimal.Decimal),
-		logger:    logger,
-		limWidth:  limWidth,
+		id:         algo.ID,
+		isActive:   true,
+		accountId:  algo.AccountId,
+		dataProc:   proc,
+		figis:      algo.Figis,
+		limits:     algo.MoneyLimits,
+		param:      paramMap,
+		algorithm:  algo,
+		buyPrice:   make(map[string]decimal.Decimal),
+		stopCh:     make(chan bool),
+		logger:     logger,
+		limWidth:   limWidth,
+		ordExp:     time.Duration(ordExpInt) * time.Second,
+		commission: getOrDefaultDecimal(paramMap, Commission, decimal.NewFromFloat(0.05)).Div(decimal.NewFromInt(100)),
 	}, nil
+}
+
+func getOrDefaultDecimal(paramMap map[string]string, param string, def decimal.Decimal) decimal.Decimal {
+	res, ok := paramMap[param]
+	if !ok {
+		return def
+	}
+	resDec, err := decimal.NewFromString(res)
+	if err != nil {
+		return def
+	} else {
+		return resDec
+	}
+}
+
+func getOrDefaultInt(paramMap map[string]string, param string, def int) int {
+	res, ok := paramMap[param]
+	if !ok {
+		return def
+	}
+	resDec, err := strconv.Atoi(res)
+	if err != nil {
+		return def
+	} else {
+		return resDec
+	}
 }

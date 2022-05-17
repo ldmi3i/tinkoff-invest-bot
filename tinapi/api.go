@@ -2,6 +2,7 @@ package tinapi
 
 import (
 	"context"
+	"go.uber.org/zap"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"invest-robot/domain"
@@ -43,9 +44,10 @@ type DefaultTinApi struct {
 	orderCl       investapi.OrdersServiceClient
 	operationsCl  investapi.OperationsServiceClient
 	orderStCl     investapi.OrdersStreamServiceClient
+	logger        *zap.SugaredLogger
 }
 
-func NewTinApi() Api {
+func NewTinApi(logger *zap.SugaredLogger) Api {
 	return &DefaultTinApi{
 		investapi.NewMarketDataServiceClient(helper.GetClient()),
 		investapi.NewMarketDataStreamServiceClient(helper.GetClient()),
@@ -54,6 +56,7 @@ func NewTinApi() Api {
 		investapi.NewOrdersServiceClient(helper.GetClient()),
 		investapi.NewOperationsServiceClient(helper.GetClient()),
 		investapi.NewOrdersStreamServiceClient(helper.GetClient()),
+		logger,
 	}
 }
 
@@ -170,6 +173,7 @@ func (t *DefaultTinApi) GetProdOrderState(req *tapi.GetOrderStateRequest) (*tapi
 
 func (t *DefaultTinApi) PostProdOrder(req *tapi.PostOrderRequest) (*tapi.PostOrderResponse, error) {
 	ctx := contextWithAuth(context.Background())
+	t.logger.Infof("Posting prod order %+v", req.ToTinApi())
 	order, err := t.orderCl.PostOrder(ctx, req.ToTinApi())
 	if err != nil {
 		return nil, err

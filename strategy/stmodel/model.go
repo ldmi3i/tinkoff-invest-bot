@@ -11,12 +11,16 @@ import (
 type Algorithm interface {
 	//Configure is to configure Algorithm after restoring it state and data from db etc.
 	Configure(ctx []domain.CtxParam) error
+	//Subscribe to algorithm and retrieve subscription to interact with algorithm
 	Subscribe() (*Subscription, error)
+	//IsActive return true if algorithm running and false if not
 	IsActive() bool
 	GetId() uint
 	GetParam() map[string]string
-	GetLimits() []*domain.MoneyLimit
+	GetAlgorithm() *domain.Algorithm
+	//Go starts algorithm running in background
 	Go() error
+	//Stop running algorithm
 	Stop() error
 }
 
