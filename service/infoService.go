@@ -103,7 +103,7 @@ func (i *BaseInfoSrv) GetAllShares() (*investapi.SharesResponse, error) {
 
 func (i *BaseInfoSrv) GetInstrumentInfoByFigi(figi string) (*tapi.InstrumentResponse, error) {
 	req := tapi.InstrumentRequest{
-		IdType: tapi.INSTRUMENT_ID_TYPE_FIGI,
+		IdType: tapi.InstrumentIdTypeFigi,
 		Id:     figi,
 	}
 	return i.tapi.GetInstrumentInfo(&req)

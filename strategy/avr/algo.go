@@ -44,7 +44,7 @@ const (
 )
 
 const (
-	tradeLimWidth   string = "limWidth"
+	TradeLimWidth   string = "limWidth"
 	OrderExpiration string = "order_expiration"
 	Commission      string = "order_commission"
 )
@@ -261,7 +261,7 @@ func NewProd(algo *domain.Algorithm, infoSrv service.InfoSrv, logger *zap.Sugare
 	}
 	paramMap := domain.ParamsToMap(algo.Params)
 	var limWidth decimal.Decimal
-	limWidthStr, ok := paramMap[tradeLimWidth]
+	limWidthStr, ok := paramMap[TradeLimWidth]
 	if ok {
 		limWidth, err = decimal.NewFromString(limWidthStr)
 		if err != nil {
@@ -297,7 +297,7 @@ func NewSandbox(algo *domain.Algorithm, infoSrv service.InfoSrv, logger *zap.Sug
 	}
 	paramMap := domain.ParamsToMap(algo.Params)
 	var limWidth decimal.Decimal
-	limWidthStr, ok := paramMap[tradeLimWidth]
+	limWidthStr, ok := paramMap[TradeLimWidth]
 	if ok {
 		limWidth, err = decimal.NewFromString(limWidthStr)
 		if err != nil {
@@ -335,7 +335,7 @@ func NewHist(algo *domain.Algorithm, hRep repository.HistoryRepository, rootLogg
 	}
 	paramMap := domain.ParamsToMap(algo.Params)
 	var limWidth decimal.Decimal
-	limWidthStr, ok := paramMap[tradeLimWidth]
+	limWidthStr, ok := paramMap[TradeLimWidth]
 	if ok {
 		limWidth, err = decimal.NewFromString(limWidthStr)
 		if err != nil {

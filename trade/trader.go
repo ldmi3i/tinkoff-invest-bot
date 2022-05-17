@@ -268,15 +268,15 @@ func (t *BaseTrader) procBuy(opInfo *trmodel.OpInfo, action *domain.Action, sub 
 	req := tapi.PostOrderRequest{
 		Figi:      action.InstrFigi,
 		PosNum:    lotAmount,
-		Direction: tapi.ORDER_DIRECTION_BUY,
+		Direction: tapi.OrderDirectionBuy,
 		AccountId: action.AccountID,
 		OrderId:   orderId,
 	}
 	if action.OrderType == domain.LIMITED && !action.ReqPrice.IsZero() {
-		req.OrderType = tapi.ORDER_TYPE_LIMIT
+		req.OrderType = tapi.OrderTypeLimit
 		req.InstrPrice = t.normalizePriceDown(action.ReqPrice, opInfo.PriceStep)
 	} else {
-		req.OrderType = tapi.ORDER_TYPE_MARKET
+		req.OrderType = tapi.OrderTypeMarket
 	}
 	action.OrderId = orderId
 	order, err := t.tradeSrv.PostOrder(&req)
@@ -308,15 +308,15 @@ func (t *BaseTrader) procSell(opInfo *trmodel.OpInfo, action *domain.Action, sub
 	req := tapi.PostOrderRequest{
 		Figi:      action.InstrFigi,
 		PosNum:    action.LotAmount,
-		Direction: tapi.ORDER_DIRECTION_SELL,
+		Direction: tapi.OrderDirectionSell,
 		AccountId: action.AccountID,
 		OrderId:   orderId,
 	}
 	if action.OrderType == domain.LIMITED && !action.ReqPrice.IsZero() {
-		req.OrderType = tapi.ORDER_TYPE_LIMIT
+		req.OrderType = tapi.OrderTypeLimit
 		req.InstrPrice = t.normalizePriceUp(action.ReqPrice, opInfo.PriceStep)
 	} else {
-		req.OrderType = tapi.ORDER_TYPE_MARKET
+		req.OrderType = tapi.OrderTypeMarket
 	}
 	action.OrderId = orderId
 	order, err := t.tradeSrv.PostOrder(&req)

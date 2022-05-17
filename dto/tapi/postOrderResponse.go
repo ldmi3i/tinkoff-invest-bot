@@ -9,7 +9,7 @@ import (
 type PostOrderExcecStatus int
 
 const (
-	EXECUTION_REPORT_STATUS_UNSPECIFIED PostOrderExcecStatus = iota
+	ExecutionReportStatusUnspecified PostOrderExcecStatus = iota
 	ExecutionReportStatusFill
 	ExecutionReportStatusRejected
 	ExecutionReportStatusCancelled

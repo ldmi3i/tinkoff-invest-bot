@@ -5,10 +5,10 @@ import investapi "invest-robot/tapigen"
 type InstrumentIdType int
 
 const (
-	INSTRUMENT_ID_UNSPECIFIED InstrumentIdType = iota
-	INSTRUMENT_ID_TYPE_FIGI
-	INSTRUMENT_ID_TYPE_TICKER
-	INSTRUMENT_ID_TYPE_UID
+	InstrumentIdUnspecified InstrumentIdType = iota
+	InstrumentIdTypeFigi
+	InstrumentIdTypeTicker
+	InstrumentIdTypeUID
 )
 
 type InstrumentRequest struct {

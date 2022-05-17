@@ -10,15 +10,15 @@ type OrderDirection int
 type OrderType int
 
 const (
-	ORDER_DIRECTION_UNSPECIFIED OrderDirection = iota
-	ORDER_DIRECTION_BUY
-	ORDER_DIRECTION_SELL
+	OrderDirectionUnspecified OrderDirection = iota
+	OrderDirectionBuy
+	OrderDirectionSell
 )
 
 const (
-	ORDER_TYPE_UNSPECIFIED OrderType = iota
-	ORDER_TYPE_LIMIT
-	ORDER_TYPE_MARKET
+	OrderTypeUnspecified OrderType = iota
+	OrderTypeLimit
+	OrderTypeMarket
 )
 
 type PostOrderRequest struct {

@@ -10,30 +10,30 @@ type SecurityTradingStatus int
 type RealExchange int
 
 const (
-	SECURITY_TRADING_STATUS_UNSPECIFIED               SecurityTradingStatus = iota //Undefined status
-	SECURITY_TRADING_STATUS_NOT_AVAILABLE_FOR_TRADING                              //Not available for trading
-	SECURITY_TRADING_STATUS_OPENING_PERIOD
-	SECURITY_TRADING_STATUS_CLOSING_PERIOD
-	SECURITY_TRADING_STATUS_BREAK_IN_TRADING
-	SECURITY_TRADING_STATUS_NORMAL_TRADING
-	SECURITY_TRADING_STATUS_CLOSING_AUCTION
-	SECURITY_TRADING_STATUS_DARK_POOL_AUCTION
-	SECURITY_TRADING_STATUS_DISCRETE_AUCTION
-	SECURITY_TRADING_STATUS_OPENING_AUCTION_PERIOD
-	SECURITY_TRADING_STATUS_TRADING_AT_CLOSING_AUCTION_PRICE
-	SECURITY_TRADING_STATUS_SESSION_ASSIGNED
-	SECURITY_TRADING_STATUS_SESSION_CLOSE
-	SECURITY_TRADING_STATUS_SESSION_OPEN
-	SECURITY_TRADING_STATUS_DEALER_NORMAL_TRADING
-	SECURITY_TRADING_STATUS_DEALER_BREAK_IN_TRADING
-	SECURITY_TRADING_STATUS_DEALER_NOT_AVAILABLE_FOR_TRADING
+	SecurityTradingStatusUnspecified            SecurityTradingStatus = iota //Undefined status
+	SecurityTradingStatusNotAvailableForTrading                              //Not available for trading
+	SecurityTradingStatusOpeningPeriod
+	SecurityTradingStatusClosingPeriod
+	SecurityTradingStatusBreakInTrading
+	SecurityTradingStatusNormalTrading
+	SecurityTradingStatusClosingAuction
+	SecurityTradingStatusDarkPoolAuction
+	SecurityTradingStatusDiscreteAuction
+	SecurityTradingStatusOpeningAuctionPeriod
+	SecurityTradingStatusTradingAtClosingAuctionPrice
+	SecurityTradingStatusSessionAssigned
+	SecurityTradingStatusSessionClose
+	SecurityTradingStatusSessionOpen
+	SecurityTradingStatusDealerNormalTrading
+	SecurityTradingStatusDealerBreakInTrading
+	SecurityTradingStatusDealerNotAvailableForTrading
 )
 
 const (
-	REAL_EXCHANGE_UNSPECIFIED RealExchange = iota
-	REAL_EXCHANGE_MOEX                     //Moscow exchange
-	REAL_EXCHANGE_RTS                      //Saint-Petersburg exchange
-	REAL_EXCHANGE_OTC                      //External instrument
+	RealExchangeUnspecified RealExchange = iota
+	RealExchangeMoex                     //Moscow exchange
+	RealExchangeRts                      //Saint-Petersburg exchange
+	RealExchangeOtc                      //External instrument
 )
 
 type InstrumentResponse struct {
@@ -70,8 +70,8 @@ type InstrumentResponse struct {
 }
 
 func (ir *InstrumentResponse) IsTradingAvailable() bool {
-	return ir.TradingStatus == SECURITY_TRADING_STATUS_NORMAL_TRADING ||
-		ir.TradingStatus == SECURITY_TRADING_STATUS_DEALER_NORMAL_TRADING
+	return ir.TradingStatus == SecurityTradingStatusNormalTrading ||
+		ir.TradingStatus == SecurityTradingStatusDealerNormalTrading
 
 }
 
