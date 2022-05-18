@@ -1,8 +1,11 @@
 package avr
 
 import (
+	"context"
 	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"invest-robot/collections"
 	"invest-robot/convert"
 	"invest-robot/domain"
@@ -21,6 +24,7 @@ type DataProcProd struct {
 	params   map[string]string
 	figis    []string
 	stopCh   chan bool
+	cancelF  context.CancelFunc
 	dtCh     chan procData
 	origDtCh chan *investapi.MarketDataResponse
 	trackId  string
@@ -40,7 +44,9 @@ func (d *DataProcProd) GetDataStream() (<-chan procData, error) {
 	if err != nil {
 		return nil, err
 	}
-	stream, err := d.infoSrv.GetDataStream()
+	var ctx context.Context
+	ctx, d.cancelF = context.WithCancel(context.Background())
+	stream, err := d.infoSrv.GetDataStream(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -123,10 +129,6 @@ OUT:
 			break OUT
 		}
 	}
-	err = d.unsubscribe()
-	if err != nil {
-		d.logger.Errorf("Error while unsubscribing to candles, id %d: %s", d.algoId, err)
-	}
 }
 
 func (d *DataProcProd) processDataInBg() {
@@ -136,13 +138,25 @@ func (d *DataProcProd) processDataInBg() {
 	}()
 	for {
 		cDat, err := d.stream.Recv()
-		if err == io.EOF {
-			d.logger.Info("Received end of stream...")
-			return
-		}
 		if err != nil {
+			if err == io.EOF {
+				d.logger.Info("Received end of stream...")
+				return
+			}
+
+			//To process errors from grpc stream (Context cancel etc)
+			if code := status.Code(err); code != codes.Unknown && code != codes.OK {
+				d.logger.Info("Received finish code: ", code)
+				return
+			}
+
 			d.logger.Warn("Error while getting stream data...", err)
-			continue
+			d.logger.Info("Trying to resubscribe to channel")
+			err = d.subscribe()
+			if err != nil {
+				d.logger.Error("Subscription failed with error: ", err, " Stopping processor...")
+				return
+			}
 		}
 		d.origDtCh <- cDat
 	}
@@ -224,7 +238,12 @@ func (d *DataProcProd) unsubscribe() error {
 
 func (d *DataProcProd) Stop() error {
 	d.logger.Info("Stopping data processor...")
+	err := d.unsubscribe()
+	if err != nil {
+		d.logger.Errorf("Error while unsubscribing to candles, id %d: %s", d.algoId, err)
+	}
 	d.stopCh <- true
+	d.cancelF()
 	d.logger.Info("Stop signal send")
 	return nil
 }

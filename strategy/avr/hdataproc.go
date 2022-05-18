@@ -80,7 +80,7 @@ func (d *DbDataProc) procBg() {
 			}
 			d.logger.Debugf("Sending data: %+v", dat)
 			d.dtCh <- dat
-			time.Sleep(100 * time.Microsecond) //To provide time for mockTrader to finish operation
+			time.Sleep(1 * time.Millisecond) //To provide time for mockTrader to finish operation
 		}
 	}
 }

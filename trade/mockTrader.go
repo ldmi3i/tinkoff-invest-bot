@@ -107,6 +107,7 @@ func (t *MockTrader) procBuy(opInfo trmodel.OpInfo, action *domain.Action, trDat
 		t.logger.Infof("Not enough money for figi %s; limit: %s; lot price: %s; one price: %s",
 			action.InstrFigi, opInfo.Lim, opInfo.PosPrice, lotPrice)
 		t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
+		return
 	}
 	lotNum := opInfo.Lim.Div(lotPrice).Floor()
 	moneyAmount := lotNum.Mul(lotPrice)
@@ -125,11 +126,13 @@ func (t *MockTrader) procSell(opInfo trmodel.OpInfo, action *domain.Action, trDa
 	if action.LotAmount == 0 {
 		t.logger.Info("LotAmount is 0 - nothing to sell")
 		t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
+		return
 	}
 	price, err := t.calcPrice(action.InstrFigi, action.RetrievedAt)
 	if err != nil {
 		t.logger.Error("Can't resolve price by figi, canceling operation...")
 		t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
+		return
 	}
 	moneyAmount := price.Mul(decimal.NewFromInt(action.LotAmount * opInfo.PosInLot)) //Money amount is a price multiplied by num of positions
 	trDat.ResAmount[opInfo.Currency] = trDat.ResAmount[opInfo.Currency].Add(moneyAmount)

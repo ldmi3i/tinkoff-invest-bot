@@ -2,6 +2,7 @@ package avr
 
 import (
 	"github.com/shopspring/decimal"
+	"github.com/tevino/abool/v2"
 	"go.uber.org/zap"
 	"invest-robot/domain"
 	"invest-robot/errors"
@@ -12,28 +13,34 @@ import (
 	"time"
 )
 
+//AlgorithmImpl is base implementation of average trading algorithm.
+//Data processor is aggregation part of algorithm and controlled by the algorithm.
+//This implementation supports one subscription and communication with one trader
+//Algorithm based on 2 moving average windows - short and long.
+//Average window values calculated and provided by DataProc
+//Average algorithm just check the difference between windows and compare sign with previous step
+//if difference changes from negative to positive - then there is trend for rising and buy condition is met
+//if difference changes from positive to negative - then there is trend to falling and sell condition is met
+//
+//Important note! Currently, at start algorithm assumes that there is no available instruments to sell (it may be added in future as parameter or domain.Algorithm)
+//So at start algorithm search for buy conditions and only after that it cat make sell operations
 type AlgorithmImpl struct {
-	id         uint
-	isActive   bool
-	dataProc   DataProc
-	accountId  string
-	figis      []string
-	limits     []*domain.MoneyLimit
-	algorithm  *domain.Algorithm
-	param      map[string]string
-	aChan      chan *stmodel.ActionReq
-	arChan     chan *stmodel.ActionResp
-	stopCh     chan bool
-	buyPrice   map[string]decimal.Decimal
-	limWidth   decimal.Decimal
-	ordExp     time.Duration
-	commission decimal.Decimal
+	id         uint                       //Algorithm id extracted for more convenience
+	isActive   *abool.AtomicBool          //Atomic bool indicating is algorithm active
+	dataProc   DataProc                   //Data processor - provides data as the channel for algorithm
+	accountId  string                     //Account id extracted for more convenience
+	figis      []string                   //List of figis to monitor and use in algorithm
+	limits     []*domain.MoneyLimit       //Limits of money available to algorithm
+	algorithm  *domain.Algorithm          //Link to original object which algorithm based
+	param      map[string]string          //Map of different algorithm configuration parameters (order expiration time etc)
+	aChan      chan *stmodel.ActionReq    //Channel to send order requests to trader
+	arChan     chan *stmodel.ActionResp   //Channel to receive responses from trader about action result
+	stopCh     chan bool                  //Channel to stop algorithm when required
+	buyPrice   map[string]decimal.Decimal //Cache of buy prices made previously (when sell go after buy - it clears record) - to prevent selling cheaper than previous buy
+	ordExp     time.Duration              //Expiration duration of posted orders - when expiration time passed and order not finished then it will be canceled
+	commission decimal.Decimal            //Commission on deals to take into account
 
 	logger *zap.SugaredLogger
-}
-
-func (a *AlgorithmImpl) GetId() uint {
-	return a.id
 }
 
 type algoStatus int
@@ -44,7 +51,6 @@ const (
 )
 
 const (
-	TradeLimWidth   string = "limWidth"
 	OrderExpiration string = "order_expiration"
 	Commission      string = "order_commission"
 )
@@ -68,7 +74,7 @@ func (a *AlgorithmImpl) Subscribe() (*stmodel.Subscription, error) {
 }
 
 func (a AlgorithmImpl) IsActive() bool {
-	return a.isActive
+	return a.isActive.IsSet()
 }
 
 func (a *AlgorithmImpl) Go() error {
@@ -78,13 +84,13 @@ func (a *AlgorithmImpl) Go() error {
 	}
 	go a.procBg(ch)
 	a.dataProc.Go()
-	a.isActive = true
+	a.isActive.Set()
 	return nil
 }
 
 func (a *AlgorithmImpl) procBg(datCh <-chan procData) {
 	defer func() {
-		a.isActive = false
+		a.isActive.UnSet()
 		close(a.arChan)
 		close(a.aChan)
 		a.logger.Infof("Stopping algorithm background; ID: %d", a.id)
@@ -189,9 +195,11 @@ func (a *AlgorithmImpl) processData(aDat *AlgoData, pDat *procData) {
 		buyPrice, ok := a.buyPrice[pDat.Figi]
 		a.logger.Infof("Check to sell; Instrument: %s; amount: %d", pDat.Figi, amount)
 		if ok {
-			a.logger.Infof("Buy price found. Current price: %s, buy price: %s", pDat.Price, buyPrice)
-			if buyPrice.GreaterThanOrEqual(pDat.Price) {
-				a.logger.Info("Buy price is greater than current, discarding sell...")
+			buyPriceComm := buyPrice.Mul(decimal.NewFromInt(1).Add(a.commission.Mul(decimal.NewFromInt(2))))
+			a.logger.Infof("Buy price found. Current price: %s, buy price: %s, buy with percents: %s", pDat.Price, buyPrice, buyPriceComm)
+			if buyPriceComm.GreaterThanOrEqual(pDat.Price) {
+				a.logger.Infof("Buy price %s is greater than current %s plus 2x commissions - not good enough, waiting better...",
+					buyPriceComm, pDat.Price)
 				return
 			}
 		}
@@ -223,7 +231,7 @@ func (a *AlgorithmImpl) makeReq(action *domain.Action) *stmodel.ActionReq {
 }
 
 func (a *AlgorithmImpl) Stop() error {
-	if !a.isActive {
+	if a.isActive.IsNotSet() {
 		a.logger.Info("Algorithm already stopped, do nothing...")
 		return nil
 	}
@@ -250,82 +258,25 @@ func (a *AlgorithmImpl) GetAlgorithm() *domain.Algorithm {
 	return a.algorithm
 }
 
-func (a *AlgorithmImpl) GetLimits() []*domain.MoneyLimit {
-	return a.limits
-}
-
+//NewProd constructs new algorithm using production data procesor
 func NewProd(algo *domain.Algorithm, infoSrv service.InfoSrv, logger *zap.SugaredLogger) (stmodel.Algorithm, error) {
 	proc, err := newDataProc(algo, infoSrv, logger)
 	if err != nil {
 		return nil, err
 	}
-	paramMap := domain.ParamsToMap(algo.Params)
-	var limWidth decimal.Decimal
-	limWidthStr, ok := paramMap[TradeLimWidth]
-	if ok {
-		limWidth, err = decimal.NewFromString(limWidthStr)
-		if err != nil {
-			logger.Error("Error parsing limit width: ", err)
-			return nil, err
-		}
-	} else {
-		limWidth = decimal.NewFromFloat(0.01)
-	}
-	ordExpInt := getOrDefaultInt(paramMap, OrderExpiration, 300)
-	return &AlgorithmImpl{
-		id:         algo.ID,
-		isActive:   true,
-		accountId:  algo.AccountId,
-		dataProc:   proc,
-		figis:      algo.Figis,
-		limits:     algo.MoneyLimits,
-		param:      paramMap,
-		algorithm:  algo,
-		buyPrice:   make(map[string]decimal.Decimal),
-		stopCh:     make(chan bool),
-		logger:     logger,
-		limWidth:   limWidth,
-		ordExp:     time.Duration(ordExpInt) * time.Second,
-		commission: getOrDefaultDecimal(paramMap, Commission, decimal.NewFromFloat(0.05)).Div(decimal.NewFromInt(100)),
-	}, nil
+	return newAvr(algo, logger, proc)
 }
 
+//NewSandbox constructs new algorithm using production data processor cause it the same for such algorithm
 func NewSandbox(algo *domain.Algorithm, infoSrv service.InfoSrv, logger *zap.SugaredLogger) (stmodel.Algorithm, error) {
 	proc, err := newDataProc(algo, infoSrv, logger)
 	if err != nil {
 		return nil, err
 	}
-	paramMap := domain.ParamsToMap(algo.Params)
-	var limWidth decimal.Decimal
-	limWidthStr, ok := paramMap[TradeLimWidth]
-	if ok {
-		limWidth, err = decimal.NewFromString(limWidthStr)
-		if err != nil {
-			logger.Error("Error parsing limit width: ", err)
-			return nil, err
-		}
-	} else {
-		limWidth = decimal.NewFromFloat(0.01)
-	}
-	ordExpInt := getOrDefaultInt(paramMap, OrderExpiration, 300)
-	return &AlgorithmImpl{
-		id:         algo.ID,
-		isActive:   true,
-		accountId:  algo.AccountId,
-		dataProc:   proc,
-		figis:      algo.Figis,
-		limits:     algo.MoneyLimits,
-		param:      paramMap,
-		algorithm:  algo,
-		buyPrice:   make(map[string]decimal.Decimal),
-		stopCh:     make(chan bool),
-		logger:     logger,
-		limWidth:   limWidth,
-		ordExp:     time.Duration(ordExpInt) * time.Second,
-		commission: getOrDefaultDecimal(paramMap, Commission, decimal.NewFromFloat(0.05)).Div(decimal.NewFromInt(100)),
-	}, nil
+	return newAvr(algo, logger, proc)
 }
 
+//NewHist constructs new algorithm using history data processor
 func NewHist(algo *domain.Algorithm, hRep repository.HistoryRepository, rootLogger *zap.SugaredLogger) (stmodel.Algorithm, error) {
 	//New logger with Increased level to suppress history analysis not necessary logging
 	logger := zap.New(rootLogger.Desugar().Core(), zap.IncreaseLevel(zap.WarnLevel)).Sugar()
@@ -333,22 +284,18 @@ func NewHist(algo *domain.Algorithm, hRep repository.HistoryRepository, rootLogg
 	if err != nil {
 		return nil, err
 	}
+	return newAvr(algo, logger, proc)
+}
+
+//Main average algorithm constructor
+func newAvr(algo *domain.Algorithm, logger *zap.SugaredLogger, proc DataProc) (stmodel.Algorithm, error) {
+	//Turn params to map for convenience
 	paramMap := domain.ParamsToMap(algo.Params)
-	var limWidth decimal.Decimal
-	limWidthStr, ok := paramMap[TradeLimWidth]
-	if ok {
-		limWidth, err = decimal.NewFromString(limWidthStr)
-		if err != nil {
-			rootLogger.Error("Error parsing limit width: ", err)
-			return nil, err
-		}
-	} else {
-		limWidth = decimal.NewFromFloat(0.01)
-	}
+	//Set order expiration time in seconds (when using limited requests), default 5 min
 	ordExpInt := getOrDefaultInt(paramMap, OrderExpiration, 300)
 	return &AlgorithmImpl{
 		id:         algo.ID,
-		isActive:   true,
+		isActive:   abool.NewBool(true),
 		accountId:  algo.AccountId,
 		dataProc:   proc,
 		figis:      algo.Figis,
@@ -358,9 +305,8 @@ func NewHist(algo *domain.Algorithm, hRep repository.HistoryRepository, rootLogg
 		buyPrice:   make(map[string]decimal.Decimal),
 		stopCh:     make(chan bool),
 		logger:     logger,
-		limWidth:   limWidth,
 		ordExp:     time.Duration(ordExpInt) * time.Second,
-		commission: getOrDefaultDecimal(paramMap, Commission, decimal.NewFromFloat(0.05)).Div(decimal.NewFromInt(100)),
+		commission: getOrDefaultDecimal(paramMap, Commission, decimal.NewFromFloat(0.04)).Div(decimal.NewFromInt(100)),
 	}, nil
 }
 

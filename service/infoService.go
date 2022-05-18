@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"invest-robot/domain"
 	"invest-robot/dto/tapi"
 	"invest-robot/errors"
@@ -14,7 +15,7 @@ type InfoSrv interface {
 	//GetHistorySorted return sorted by time history in time interval
 	GetHistorySorted(finis []string, ivl investapi.CandleInterval, startTime time.Time, endTime time.Time) ([]domain.History, error)
 	//GetDataStream returns bidirectional data stream client
-	GetDataStream() (investapi.MarketDataStreamService_MarketDataStreamClient, error)
+	GetDataStream(ctx context.Context) (investapi.MarketDataStreamService_MarketDataStreamClient, error)
 	//GetAllShares return all shares, available for operating through API
 	GetAllShares() (*investapi.SharesResponse, error) //TODO change response to DTO!
 	GetInstrumentInfoByFigi(figi string) (*tapi.InstrumentResponse, error)
@@ -93,8 +94,8 @@ func nextTime(ivl investapi.CandleInterval, startTime time.Time) (*time.Time, er
 	}
 }
 
-func (i *BaseInfoSrv) GetDataStream() (investapi.MarketDataStreamService_MarketDataStreamClient, error) {
-	return i.tapi.MarketDataStream()
+func (i *BaseInfoSrv) GetDataStream(ctx context.Context) (investapi.MarketDataStreamService_MarketDataStreamClient, error) {
+	return i.tapi.MarketDataStream(ctx)
 }
 
 func (i *BaseInfoSrv) GetAllShares() (*investapi.SharesResponse, error) {

@@ -140,7 +140,7 @@ func (h *DefaultHistoryAPI) rangeAnalyzeBg(algRange []stmodel.Algorithm, req *dt
 	shares *investapi.SharesResponse) (chan bool, chan *dto.HistStatIdDto) {
 	var wg sync.WaitGroup
 	resCh := make(chan *dto.HistStatIdDto)
-	concurrency := 8
+	concurrency := 18
 	semaphore := make(chan bool, concurrency)
 	//Performs background algorithm processing
 	for _, alg := range algRange {
@@ -157,7 +157,7 @@ func (h *DefaultHistoryAPI) rangeAnalyzeBg(algRange []stmodel.Algorithm, req *dt
 				return
 			}
 			resCh <- &dto.HistStatIdDto{
-				Id:       alg.GetId(),
+				Id:       alg.GetAlgorithm().ID,
 				HistStat: histResult,
 				Param:    alg.GetParam(),
 			}

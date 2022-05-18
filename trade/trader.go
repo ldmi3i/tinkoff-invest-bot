@@ -100,7 +100,7 @@ func (t *BaseTrader) checkOrdersBg() {
 				t.logger.Infof("Order with id %s rejected", entry.Key)
 				sub.RChan <- &stmodel.ActionResp{Action: action}
 			case tapi.ExecutionReportStatusCancelled:
-				action.Status = domain.FAILED
+				action.Status = domain.CANCELED
 				action.Info = "Order was canceled"
 				err = t.actionRep.Save(action)
 				if err != nil {
@@ -124,8 +124,12 @@ func (t *BaseTrader) checkOrdersBg() {
 					}
 					t.orders.Delete(entry.Key)
 					t.logger.Info("Order was canceled successfully: ", cResp)
-					action.Status = domain.FAILED
+					action.Status = domain.CANCELED
 					action.Info = "Order was canceled"
+					err = t.actionRep.Save(action) //Full save required to persist previously made changes
+					if err != nil {
+						t.logger.Errorf("Error while updating action %+v: %s", action, err)
+					}
 					sub.RChan <- &stmodel.ActionResp{Action: action}
 				}
 			}

@@ -17,7 +17,7 @@ import (
 type Api interface {
 	GetOrderBook() (*investapi.GetOrderBookResponse, error)
 	GetHistorySorted(figis []string, ivl investapi.CandleInterval, startDate time.Time, endDate time.Time) ([]domain.History, error)
-	MarketDataStream() (investapi.MarketDataStreamService_MarketDataStreamClient, error)
+	MarketDataStream(ctx context.Context) (investapi.MarketDataStreamService_MarketDataStreamClient, error)
 	GetAllShares() (*investapi.SharesResponse, error)
 	GetInstrumentInfo(req *tapi.InstrumentRequest) (*tapi.InstrumentResponse, error)
 	GetLastPrices(req *tapi.LastPricesRequest) (*tapi.LastPricesResponse, error)
@@ -106,9 +106,9 @@ func contextWithAuth(ctx context.Context) context.Context {
 	return metadata.NewOutgoingContext(ctx, md)
 }
 
-func (t *DefaultTinApi) MarketDataStream() (investapi.MarketDataStreamService_MarketDataStreamClient, error) {
-	ctx := contextWithAuth(context.Background())
-	stream, err := t.marketDatStCl.MarketDataStream(ctx)
+func (t *DefaultTinApi) MarketDataStream(ctx context.Context) (investapi.MarketDataStreamService_MarketDataStreamClient, error) {
+	aCtx := contextWithAuth(ctx)
+	stream, err := t.marketDatStCl.MarketDataStream(aCtx)
 	if err != nil {
 		return nil, err
 	}
