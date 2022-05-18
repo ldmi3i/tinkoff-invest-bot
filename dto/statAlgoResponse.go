@@ -6,6 +6,7 @@ type StatAlgoResponse struct {
 	AlgorithmID       uint
 	SuccessOrders     uint             //Number of success orders
 	FailedOrders      uint             //Number of failed orders
+	CanceledOrders    uint             //Number of cancelled orders
 	MoneyChanges      []MoneyStat      //Data about how money amount changed by each currency
 	InstrumentChanges []InstrumentStat //Data about how instrument amount changed by each instrument
 }

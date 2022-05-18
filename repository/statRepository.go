@@ -18,7 +18,10 @@ func NewStatRepository(db *gorm.DB) StatRepository {
 }
 
 func (r *PgStatRepository) GetAlgorithmStat(req *dto.StatAlgoRequest) (*dto.StatAlgoResponse, error) {
-	moneyStat := r.getMoneyStat(req.AlgorithmID)
+	moneyStat, err := r.getMoneyStat(req.AlgorithmID)
+	if err != nil {
+		return nil, err
+	}
 	var successOp uint
 	for _, st := range moneyStat {
 		successOp += st.OperationNum
@@ -28,23 +31,31 @@ func (r *PgStatRepository) GetAlgorithmStat(req *dto.StatAlgoRequest) (*dto.Stat
 	var failedOp uint
 	r.db.Raw(failedCountSql, req.AlgorithmID).Scan(&failedOp)
 
-	instrStat := r.getInstrStat(req.AlgorithmID)
+	canceledCountSql := "select count(*) from actions where algorithm_id = ? and status = 'CANCELED'"
+	var canceledOp uint
+	r.db.Raw(canceledCountSql, req.AlgorithmID).Scan(&canceledOp)
+
+	instrStat, err := r.getInstrStat(req.AlgorithmID)
+	if err != nil {
+		return nil, err
+	}
 
 	res := &dto.StatAlgoResponse{
 		AlgorithmID:       req.AlgorithmID,
 		SuccessOrders:     successOp,
 		FailedOrders:      failedOp,
+		CanceledOrders:    canceledOp,
 		MoneyChanges:      moneyStat,
 		InstrumentChanges: instrStat,
 	}
 	return res, nil
 }
 
-func (r *PgStatRepository) getMoneyStat(algoId uint) []dto.MoneyStat {
+func (r *PgStatRepository) getMoneyStat(algoId uint) ([]dto.MoneyStat, error) {
 	moneyStatSql := `with sc as (select id,
                    currency,
                    updated_at,
-                   case when direction = 0 then -amount else amount end as sign_amount
+                   case when direction = 0 then -total_price else total_price end as sign_amount
             from actions a
             where a.algorithm_id = ?
               and a.status = 'SUCCESS'),
@@ -58,18 +69,20 @@ func (r *PgStatRepository) getMoneyStat(algoId uint) []dto.MoneyStat {
      from sc_wdw
      where row = 1`
 	var moneyStat []dto.MoneyStat
-	r.db.Raw(moneyStatSql, algoId).Scan(&moneyStat)
-	return moneyStat
+	if err := r.db.Raw(moneyStatSql, algoId).Scan(&moneyStat).Error; err != nil {
+		return nil, err
+	}
+	return moneyStat, nil
 }
 
-func (r *PgStatRepository) getInstrStat(algoId uint) []dto.InstrumentStat {
+func (r *PgStatRepository) getInstrStat(algoId uint) ([]dto.InstrumentStat, error) {
 	instrumentStatSql := `with sc as (select id,
                    instr_figi,
-                   amount / lot_amount                                          as lot_price,
-                   case when direction = 0 then lot_amount else -lot_amount end as sign_lot_amount,
+                   total_price / lot_amount                                       as lot_price,
+                   case when direction = 0 then lot_amount else -lot_amount end   as sign_lot_amount,
                    currency,
                    updated_at,
-                   case when direction = 0 then -amount else amount end         as sign_amount
+                   case when direction = 0 then -total_price else total_price end as sign_amount
             from actions a
             where a.algorithm_id = ?
               and a.status = 'SUCCESS'),
@@ -92,6 +105,8 @@ func (r *PgStatRepository) getInstrStat(algoId uint) []dto.InstrumentStat {
      where row = 1`
 
 	var instrStat []dto.InstrumentStat
-	r.db.Raw(instrumentStatSql, algoId).Scan(&instrStat)
-	return instrStat
+	if err := r.db.Raw(instrumentStatSql, algoId).Scan(&instrStat).Error; err != nil {
+		return nil, err
+	}
+	return instrStat, nil
 }
