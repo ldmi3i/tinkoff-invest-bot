@@ -1,6 +1,7 @@
 package trade
 
 import (
+	"context"
 	"go.uber.org/zap"
 	"invest-robot/collections"
 	"invest-robot/domain"
@@ -13,7 +14,8 @@ type SandboxTrader struct {
 	*BaseTrader
 }
 
-func (t *SandboxTrader) Go() {
+func (t *SandboxTrader) Go(ctx context.Context) {
+	t.ctx = ctx
 	go t.checkOrdersBg()
 	go t.actionProcBg()
 }

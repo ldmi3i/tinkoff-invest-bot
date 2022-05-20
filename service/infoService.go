@@ -11,18 +11,17 @@ import (
 )
 
 type InfoSrv interface {
-	GetOrderBook() (*investapi.GetOrderBookResponse, error)
 	//GetHistorySorted return sorted by time history in time interval
-	GetHistorySorted(finis []string, ivl investapi.CandleInterval, startTime time.Time, endTime time.Time) ([]domain.History, error)
+	GetHistorySorted(finis []string, ivl investapi.CandleInterval, startTime time.Time, endTime time.Time, ctx context.Context) ([]domain.History, error)
 	//GetDataStream returns bidirectional data stream client
 	GetDataStream(ctx context.Context) (investapi.MarketDataStreamService_MarketDataStreamClient, error)
 	//GetAllShares return all shares, available for operating through API
-	GetAllShares() (*investapi.SharesResponse, error) //TODO change response to DTO!
-	GetInstrumentInfoByFigi(figi string) (*tapi.InstrumentResponse, error)
-	GetOrderState(req *tapi.GetOrderStateRequest) (*tapi.GetOrderStateResponse, error)
+	GetAllShares(ctx context.Context) (*investapi.SharesResponse, error) //TODO change response to DTO!
+	GetInstrumentInfoByFigi(figi string, ctx context.Context) (*tapi.InstrumentResponse, error)
+	GetOrderState(req *tapi.GetOrderStateRequest, ctx context.Context) (*tapi.GetOrderStateResponse, error)
 
-	GetLastPrices(figis []string) (*tapi.LastPricesResponse, error)
-	GetPositions(req *tapi.PositionsRequest) (*tapi.PositionsResponse, error)
+	GetLastPrices(figis []string, ctx context.Context) (*tapi.LastPricesResponse, error)
+	GetPositions(req *tapi.PositionsRequest, ctx context.Context) (*tapi.PositionsResponse, error)
 }
 
 type BaseInfoSrv struct {
@@ -33,23 +32,19 @@ func newBaseSrv(t tinapi.Api) *BaseInfoSrv {
 	return &BaseInfoSrv{tapi: t}
 }
 
-func (i *BaseInfoSrv) GetOrderBook() (*investapi.GetOrderBookResponse, error) {
-	return i.tapi.GetOrderBook()
-}
-
-func (i *BaseInfoSrv) GetHistorySorted(figis []string, ivl investapi.CandleInterval, startTime time.Time, endTime time.Time) ([]domain.History, error) {
+func (i *BaseInfoSrv) GetHistorySorted(figis []string, ivl investapi.CandleInterval, startTime time.Time, endTime time.Time, ctx context.Context) ([]domain.History, error) {
 	next, err := nextTime(ivl, startTime)
 	if err != nil {
 		return nil, err
 	}
 	var hist []domain.History
 	if next.After(endTime) {
-		hist, err = i.tapi.GetHistorySorted(figis, ivl, startTime, endTime)
+		hist, err = i.tapi.GetHistorySorted(figis, ivl, startTime, endTime, ctx)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		if hist, err = i.tapi.GetHistorySorted(figis, ivl, startTime, *next); err != nil {
+		if hist, err = i.tapi.GetHistorySorted(figis, ivl, startTime, *next, ctx); err != nil {
 			return nil, err
 		}
 		curr := next
@@ -57,7 +52,7 @@ func (i *BaseInfoSrv) GetHistorySorted(figis []string, ivl investapi.CandleInter
 			return nil, err
 		}
 		for next.Before(endTime) {
-			row, err := i.tapi.GetHistorySorted(figis, ivl, *curr, *next)
+			row, err := i.tapi.GetHistorySorted(figis, ivl, *curr, *next, ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -67,7 +62,7 @@ func (i *BaseInfoSrv) GetHistorySorted(figis []string, ivl investapi.CandleInter
 				return nil, err
 			}
 		}
-		row, err := i.tapi.GetHistorySorted(figis, ivl, *curr, endTime)
+		row, err := i.tapi.GetHistorySorted(figis, ivl, *curr, endTime, ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -98,19 +93,19 @@ func (i *BaseInfoSrv) GetDataStream(ctx context.Context) (investapi.MarketDataSt
 	return i.tapi.MarketDataStream(ctx)
 }
 
-func (i *BaseInfoSrv) GetAllShares() (*investapi.SharesResponse, error) {
-	return i.tapi.GetAllShares()
+func (i *BaseInfoSrv) GetAllShares(ctx context.Context) (*investapi.SharesResponse, error) {
+	return i.tapi.GetAllShares(ctx)
 }
 
-func (i *BaseInfoSrv) GetInstrumentInfoByFigi(figi string) (*tapi.InstrumentResponse, error) {
+func (i *BaseInfoSrv) GetInstrumentInfoByFigi(figi string, ctx context.Context) (*tapi.InstrumentResponse, error) {
 	req := tapi.InstrumentRequest{
 		IdType: tapi.InstrumentIdTypeFigi,
 		Id:     figi,
 	}
-	return i.tapi.GetInstrumentInfo(&req)
+	return i.tapi.GetInstrumentInfo(&req, ctx)
 }
 
-func (i *BaseInfoSrv) GetLastPrices(figis []string) (*tapi.LastPricesResponse, error) {
+func (i *BaseInfoSrv) GetLastPrices(figis []string, ctx context.Context) (*tapi.LastPricesResponse, error) {
 	req := tapi.LastPricesRequest{Figis: figis}
-	return i.tapi.GetLastPrices(&req)
+	return i.tapi.GetLastPrices(&req, ctx)
 }

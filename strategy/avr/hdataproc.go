@@ -1,11 +1,11 @@
 package avr
 
 import (
+	"context"
 	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
 	"invest-robot/collections"
 	"invest-robot/domain"
-	"invest-robot/errors"
 	"invest-robot/repository"
 	"strconv"
 	"time"
@@ -19,6 +19,7 @@ type DbDataProc struct {
 	hist   []domain.History
 	dtCh   chan procData
 	logger *zap.SugaredLogger
+	ctx    context.Context
 
 	sav collections.TList[decimal.Decimal]
 	lav collections.TList[decimal.Decimal]
@@ -42,8 +43,10 @@ func (d *DbDataProc) GetDataStream() (<-chan procData, error) {
 	return d.dtCh, nil
 }
 
-func (d *DbDataProc) Go() {
+func (d *DbDataProc) Go(ctx context.Context) error {
+	d.ctx = ctx
 	go d.procBg()
+	return nil
 }
 
 func (d *DbDataProc) procBg() {
@@ -55,38 +58,40 @@ func (d *DbDataProc) procBg() {
 	sOk := false
 	lOk := false
 	for _, hDat := range d.hist {
-		d.logger.Debugf("Processing data %+v", hDat)
-		sPop := d.sav.Append(hDat.Close, hDat.Time)
-		lPop := d.lav.Append(hDat.Close, hDat.Time)
-		sOk = sOk || sPop
-		lOk = lOk || lPop
-		if sOk && lOk {
-			sav, err := calcAvg(&d.sav)
-			if err != nil {
-				d.logger.Errorf("Error while calculating short average:\n%s", err)
-				break
+		select {
+		case <-d.ctx.Done():
+			d.logger.Info("Canceled context, stopping processor...")
+			return
+		default:
+			d.logger.Debugf("Processing data %+v", hDat)
+			sPop := d.sav.Append(hDat.Close, hDat.Time)
+			lPop := d.lav.Append(hDat.Close, hDat.Time)
+			sOk = sOk || sPop
+			lOk = lOk || lPop
+			if sOk && lOk {
+				sav, err := calcAvg(&d.sav)
+				if err != nil {
+					d.logger.Errorf("Error while calculating short average:\n%s", err)
+					break
+				}
+				lav, err := calcAvg(&d.lav)
+				if err != nil {
+					d.logger.Errorf("Error while calculating long average:\n%s", err)
+					break
+				}
+				dat := procData{
+					Figi:  hDat.Figi,
+					Time:  hDat.Time,
+					LAV:   *lav,
+					SAV:   *sav,
+					Price: hDat.Close,
+				}
+				d.logger.Debugf("Sending data: %+v", dat)
+				d.dtCh <- dat
+				time.Sleep(1 * time.Millisecond) //To provide time for mockTrader to finish operation
 			}
-			lav, err := calcAvg(&d.lav)
-			if err != nil {
-				d.logger.Errorf("Error while calculating long average:\n%s", err)
-				break
-			}
-			dat := procData{
-				Figi:  hDat.Figi,
-				Time:  hDat.Time,
-				LAV:   *lav,
-				SAV:   *sav,
-				Price: hDat.Close,
-			}
-			d.logger.Debugf("Sending data: %+v", dat)
-			d.dtCh <- dat
-			time.Sleep(1 * time.Millisecond) //To provide time for mockTrader to finish operation
 		}
 	}
-}
-
-func (d *DbDataProc) Stop() error {
-	return errors.NewNotImplemented()
 }
 
 func newHistoryDataProc(req *domain.Algorithm, rep repository.HistoryRepository, logger *zap.SugaredLogger) (DataProc, error) {

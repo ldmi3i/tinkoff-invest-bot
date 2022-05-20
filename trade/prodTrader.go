@@ -1,6 +1,7 @@
 package trade
 
 import (
+	"context"
 	"go.uber.org/zap"
 	"invest-robot/collections"
 	"invest-robot/domain"
@@ -13,7 +14,8 @@ type ProdApiTrader struct {
 	*BaseTrader
 }
 
-func (t *ProdApiTrader) Go() {
+func (t *ProdApiTrader) Go(ctx context.Context) {
+	t.ctx = ctx
 	go t.checkOrdersBg()
 	go t.actionProcBg()
 }

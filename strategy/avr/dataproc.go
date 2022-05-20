@@ -1,6 +1,7 @@
 package avr
 
 import (
+	"context"
 	"github.com/shopspring/decimal"
 	"invest-robot/collections"
 	"invest-robot/errors"
@@ -10,8 +11,7 @@ import (
 
 type DataProc interface {
 	GetDataStream() (<-chan procData, error)
-	Go()
-	Stop() error
+	Go(ctx context.Context) error
 }
 
 type procData struct {

@@ -1,6 +1,7 @@
 package robot
 
 import (
+	"context"
 	"go.uber.org/zap"
 	"invest-robot/domain"
 	"invest-robot/dto"
@@ -16,9 +17,9 @@ import (
 )
 
 type HistoryAPI interface {
-	LoadHistory(figis []string, ivl investapi.CandleInterval, startTime time.Time, endTime time.Time) error
-	AnalyzeAlgo(req *dto.CreateAlgorithmRequest) (*dto.HistStatResponse, error)
-	AnalyzeAlgoInRange(req *dto.CreateAlgorithmRequest) (*dto.HistStatInRangeResponse, error)
+	LoadHistory(figis []string, ivl investapi.CandleInterval, startTime time.Time, endTime time.Time, ctx context.Context) error
+	AnalyzeAlgo(req *dto.CreateAlgorithmRequest, ctx context.Context) (*dto.HistStatResponse, error)
+	AnalyzeAlgoInRange(req *dto.CreateAlgorithmRequest, ctx context.Context) (*dto.HistStatInRangeResponse, error)
 }
 
 type DefaultHistoryAPI struct {
@@ -29,9 +30,9 @@ type DefaultHistoryAPI struct {
 	logger  *zap.SugaredLogger
 }
 
-func (h *DefaultHistoryAPI) LoadHistory(figis []string, ivl investapi.CandleInterval, startTime time.Time, endTime time.Time) error {
+func (h *DefaultHistoryAPI) LoadHistory(figis []string, ivl investapi.CandleInterval, startTime time.Time, endTime time.Time, ctx context.Context) error {
 	h.logger.Infof("Load history for figis: %s in interval: %d, From: %s to %s", figis, ivl, startTime, endTime)
-	history, err := h.infoSrv.GetHistorySorted(figis, ivl, startTime, endTime)
+	history, err := h.infoSrv.GetHistorySorted(figis, ivl, startTime, endTime, ctx)
 	if err != nil {
 		return err
 	}
@@ -42,18 +43,18 @@ func (h *DefaultHistoryAPI) LoadHistory(figis []string, ivl investapi.CandleInte
 	return nil
 }
 
-func (h *DefaultHistoryAPI) AnalyzeAlgo(req *dto.CreateAlgorithmRequest) (*dto.HistStatResponse, error) {
+func (h *DefaultHistoryAPI) AnalyzeAlgo(req *dto.CreateAlgorithmRequest, ctx context.Context) (*dto.HistStatResponse, error) {
 	h.logger.Info("Analyze algorithm request: ", req)
 	algDm := domain.AlgorithmFromDto(req)
 	alg, err := h.aFact.NewHist(algDm)
 	if err != nil {
 		return nil, err
 	}
-	shares, err := h.infoSrv.GetAllShares()
+	shares, err := h.infoSrv.GetAllShares(ctx)
 	if err != nil {
 		return nil, err
 	}
-	res, err := h.performAnalysis(req, shares, alg)
+	res, err := h.performAnalysis(req, shares, alg, ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +63,7 @@ func (h *DefaultHistoryAPI) AnalyzeAlgo(req *dto.CreateAlgorithmRequest) (*dto.H
 }
 
 func (h *DefaultHistoryAPI) performAnalysis(req *dto.CreateAlgorithmRequest, shares *investapi.SharesResponse,
-	alg stmodel.Algorithm) (*dto.HistStatResponse, error) {
+	alg stmodel.Algorithm, ctx context.Context) (*dto.HistStatResponse, error) {
 	sub, err := alg.Subscribe()
 	if err != nil {
 		return nil, err
@@ -84,41 +85,35 @@ func (h *DefaultHistoryAPI) performAnalysis(req *dto.CreateAlgorithmRequest, sha
 	if err = trDr.AddSubscription(sub); err != nil {
 		return nil, err
 	}
-	trDr.Go()
-	if err = alg.Go(); err != nil {
-		log.Printf("Error while starting algorithm, check routine leaking")
+	trDr.Go(ctx)
+	if err = alg.Go(ctx); err != nil {
+		log.Printf("Error while starting algorithm")
 		return nil, err
 	}
 	res := <-trDr.GetStatCh()
 	return &res, nil
 }
 
-func (h *DefaultHistoryAPI) AnalyzeAlgoInRange(req *dto.CreateAlgorithmRequest) (*dto.HistStatInRangeResponse, error) {
+func (h *DefaultHistoryAPI) AnalyzeAlgoInRange(req *dto.CreateAlgorithmRequest, ctx context.Context) (*dto.HistStatInRangeResponse, error) {
 	h.logger.Info("Analyze algorithm in range from request: ", req)
 	algDm := domain.AlgorithmFromDto(req)
 	algRange, err := h.aFact.NewRange(algDm)
 	if err != nil {
 		return nil, err
 	}
-	shares, err := h.infoSrv.GetAllShares()
+	shares, err := h.infoSrv.GetAllShares(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	doneCh, resCh := h.rangeAnalyzeBg(algRange, req, shares)
+	resCh := h.rangeAnalyzeBg(algRange, req, shares, ctx)
 	analyzeRes := make([]*dto.HistStatIdDto, 0, len(algRange))
-OUT:
-	for {
-		select {
-		case algRes := <-resCh:
-			h.logger.Debug("Result received: ", algRes)
-			analyzeRes = append(analyzeRes, algRes)
-		case <-doneCh:
-			close(doneCh)
-			close(resCh)
-			break OUT
-		}
+
+	for algRes := range resCh {
+		h.logger.Debug("Result received: ", algRes)
+		analyzeRes = append(analyzeRes, algRes)
 	}
+
 	if len(analyzeRes) == 0 {
 		return nil, nil
 	}
@@ -137,40 +132,44 @@ OUT:
 }
 
 func (h *DefaultHistoryAPI) rangeAnalyzeBg(algRange []stmodel.Algorithm, req *dto.CreateAlgorithmRequest,
-	shares *investapi.SharesResponse) (chan bool, chan *dto.HistStatIdDto) {
+	shares *investapi.SharesResponse, ctx context.Context) chan *dto.HistStatIdDto {
 	var wg sync.WaitGroup
 	resCh := make(chan *dto.HistStatIdDto)
 	concurrency := 18
 	semaphore := make(chan bool, concurrency)
 	//Performs background algorithm processing
-	for _, alg := range algRange {
-		wg.Add(1)
-		go func(alg stmodel.Algorithm) {
-			semaphore <- true
-			defer func() {
-				<-semaphore
-				wg.Done()
-			}()
-			histResult, err := h.performAnalysis(req, shares, alg)
-			if err != nil {
-				h.logger.Error("Error while performing algorithm analysis: ", err)
-				return
-			}
-			resCh <- &dto.HistStatIdDto{
-				Id:       alg.GetAlgorithm().ID,
-				HistStat: histResult,
-				Param:    alg.GetParam(),
-			}
-		}(alg)
-	}
-	//Make channel indicating result (in case of errors result len may not be equals to algRange len)
-	doneCh := make(chan bool)
-	//Launch in bg populating done channel when all groups completed
 	go func() {
+	OUT:
+		for _, alg := range algRange {
+			select {
+			case <-ctx.Done():
+				h.logger.Infof("History range context closed with err: %s, stopping...", ctx.Err())
+				break OUT
+			case semaphore <- true:
+				wg.Add(1)
+				go func(alg stmodel.Algorithm) {
+					defer func() {
+						<-semaphore
+						wg.Done()
+					}()
+					histResult, err := h.performAnalysis(req, shares, alg, ctx)
+					if err != nil {
+						h.logger.Error("Error while performing algorithm analysis: ", err)
+						return
+					}
+					resCh <- &dto.HistStatIdDto{
+						Id:       alg.GetAlgorithm().ID,
+						HistStat: histResult,
+						Param:    alg.GetParam(),
+					}
+				}(alg)
+			}
+		}
 		wg.Wait()
-		doneCh <- true
+		close(resCh)
 	}()
-	return doneCh, resCh
+
+	return resCh
 }
 
 func NewHistoryAPI(infoSrv service.InfoSrv, histRep repository.HistoryRepository, aFact strategy.AlgFactory,

@@ -1,6 +1,7 @@
 package avr
 
 import (
+	"context"
 	"github.com/shopspring/decimal"
 	"github.com/tevino/abool/v2"
 	"go.uber.org/zap"
@@ -39,6 +40,8 @@ type AlgorithmImpl struct {
 	buyPrice   map[string]decimal.Decimal //Cache of buy prices made previously (when sell go after buy - it clears record) - to prevent selling cheaper than previous buy
 	ordExp     time.Duration              //Expiration duration of posted orders - when expiration time passed and order not finished then it will be canceled
 	commission decimal.Decimal            //Commission on deals to take into account
+	ctx        context.Context
+	cancelF    context.CancelFunc
 
 	logger *zap.SugaredLogger
 }
@@ -77,13 +80,19 @@ func (a AlgorithmImpl) IsActive() bool {
 	return a.isActive.IsSet()
 }
 
-func (a *AlgorithmImpl) Go() error {
+func (a *AlgorithmImpl) Go(parCtx context.Context) error {
+	a.ctx, a.cancelF = context.WithCancel(parCtx)
 	ch, err := a.dataProc.GetDataStream()
 	if err != nil {
 		return err
 	}
 	go a.procBg(ch)
-	a.dataProc.Go()
+	err = a.dataProc.Go(a.ctx)
+	if err != nil {
+		a.logger.Error("Error while starting data processor: ", err)
+		a.stopInternal()
+		return errors.NewUnexpectedError("Error while starting data processor " + err.Error())
+	}
 	a.isActive.Set()
 	return nil
 }
@@ -124,8 +133,8 @@ func (a *AlgorithmImpl) procBg(datCh <-chan procData) {
 				a.logger.Infof("Closed data processor stream, stopping algorithm...")
 				return
 			}
-		case <-a.stopCh:
-			a.logger.Info("Stop signal received, stopping bg task algorithm...")
+		case <-a.ctx.Done():
+			a.logger.Info("Context canceled, stopping...")
 			return
 		}
 	}
@@ -235,15 +244,13 @@ func (a *AlgorithmImpl) Stop() error {
 		a.logger.Info("Algorithm already stopped, do nothing...")
 		return nil
 	}
-	a.logger.Info("Stopping algorithm: ", a.algorithm)
-	a.stopCh <- true
-	err := a.dataProc.Stop()
-	if err != nil {
-		a.logger.Error("Algorithm stopped, but data processor exit with error!")
-		return err
-	}
-	a.logger.Infof("Algorithm %d successfully stopped", a.algorithm.ID)
+	a.stopInternal()
 	return nil
+}
+
+func (a *AlgorithmImpl) stopInternal() {
+	a.cancelF()
+	a.logger.Infof("Algorithm %d successfully stopped", a.algorithm.ID)
 }
 
 func (a *AlgorithmImpl) Configure(ctx []domain.CtxParam) error {

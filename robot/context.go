@@ -1,6 +1,7 @@
 package robot
 
 import (
+	"context"
 	"go.uber.org/zap"
 	"invest-robot/helper"
 	"invest-robot/repository"
@@ -61,6 +62,7 @@ func init() {
 		sdxTrader:    sdxTrader,
 		prodTrader:   prodTrader,
 		logger:       sugared,
+		ctx:          context.Background(),
 	}
 }
 
@@ -78,6 +80,7 @@ type Context struct {
 	sdxTrader    trade.Trader
 	prodTrader   trade.Trader
 	logger       *zap.SugaredLogger
+	ctx          context.Context
 }
 
 func (ctx *Context) GetSandboxInfoSrv() service.InfoSrv {
@@ -118,8 +121,8 @@ func (ctx *Context) GetStatService() service.StatService {
 
 func StartBgTasks() {
 	ctx.logger.Info("Starting background tasks...")
-	ctx.sdxTrader.Go()
-	ctx.prodTrader.Go()
+	ctx.sdxTrader.Go(ctx.ctx)
+	ctx.prodTrader.Go(ctx.ctx)
 }
 
 func PostProcess() {

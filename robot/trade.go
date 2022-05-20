@@ -1,13 +1,14 @@
 package robot
 
 import (
+	"context"
 	"go.uber.org/zap"
 	"invest-robot/dto"
 	"invest-robot/strategy"
 )
 
 type TradeAPI interface {
-	Trade(req *dto.CreateAlgorithmRequest) (*dto.TradeStartResponse, error)
+	Trade(req *dto.CreateAlgorithmRequest, ctx context.Context) (*dto.TradeStartResponse, error)
 	GetActiveAlgorithms() (*dto.AlgorithmsResponse, error)
 	StopAlgorithm(req *dto.StopAlgorithmRequest) (*dto.StopAlgorithmResponse, error)
 }

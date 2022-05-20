@@ -23,8 +23,7 @@ type DataProcProd struct {
 	algoId   uint
 	params   map[string]string
 	figis    []string
-	stopCh   chan bool
-	cancelF  context.CancelFunc
+	ctx      context.Context
 	dtCh     chan procData
 	origDtCh chan *investapi.MarketDataResponse
 	trackId  string
@@ -44,13 +43,6 @@ func (d *DataProcProd) GetDataStream() (<-chan procData, error) {
 	if err != nil {
 		return nil, err
 	}
-	var ctx context.Context
-	ctx, d.cancelF = context.WithCancel(context.Background())
-	stream, err := d.infoSrv.GetDataStream(ctx)
-	if err != nil {
-		return nil, err
-	}
-	d.stream = stream
 
 	for _, figi := range d.figis {
 		sav := collections.NewTList[decimal.Decimal](time.Duration(shortDur) * time.Second)
@@ -61,8 +53,15 @@ func (d *DataProcProd) GetDataStream() (<-chan procData, error) {
 	return d.dtCh, nil
 }
 
-func (d *DataProcProd) Go() {
+func (d *DataProcProd) Go(ctx context.Context) error {
+	d.ctx = ctx
+	stream, err := d.infoSrv.GetDataStream(d.ctx)
+	if err != nil {
+		return err
+	}
+	d.stream = stream
 	go d.procBg()
+	return nil
 }
 
 func (d *DataProcProd) procBg() {
@@ -124,8 +123,8 @@ OUT:
 			}
 			d.logger.Debugf("Sending data for alg %d: %+v", d.algoId, dat)
 			d.dtCh <- dat
-		case <-d.stopCh:
-			d.logger.Info("Stop signal received, breaking cycle...")
+		case <-d.ctx.Done():
+			d.logger.Info("Algorithm canceling context signal received...")
 			break OUT
 		}
 	}
@@ -145,12 +144,11 @@ func (d *DataProcProd) processDataInBg() {
 			}
 
 			//To process errors from grpc stream (Context cancel etc)
-			if code := status.Code(err); code != codes.Unknown && code != codes.OK {
-				d.logger.Info("Received finish code: ", code)
+			if code := status.Code(err); code == codes.Canceled {
+				d.logger.Info("Received canceled code: ", code)
 				return
 			}
 
-			d.logger.Warn("Error while getting stream data...", err)
 			d.logger.Info("Trying to resubscribe to channel")
 			err = d.subscribe()
 			if err != nil {
@@ -166,7 +164,7 @@ func (d *DataProcProd) prefetchHistory() error {
 	endTime := time.Now()
 	dur := time.Duration(-d.longDur) * time.Second
 	startTime := endTime.Add(dur)
-	history, err := d.infoSrv.GetHistorySorted(d.figis, investapi.CandleInterval_CANDLE_INTERVAL_1_MIN, startTime, endTime)
+	history, err := d.infoSrv.GetHistorySorted(d.figis, investapi.CandleInterval_CANDLE_INTERVAL_1_MIN, startTime, endTime, d.ctx)
 	if err != nil {
 		return err
 	}
@@ -242,8 +240,6 @@ func (d *DataProcProd) Stop() error {
 	if err != nil {
 		d.logger.Errorf("Error while unsubscribing to candles, id %d: %s", d.algoId, err)
 	}
-	d.stopCh <- true
-	d.cancelF()
 	d.logger.Info("Stop signal send")
 	return nil
 }
@@ -255,7 +251,6 @@ func newDataProc(req *domain.Algorithm, infoSrv service.InfoSrv, logger *zap.Sug
 		algoId:   req.ID,
 		params:   domain.ParamsToMap(req.Params),
 		figis:    req.Figis,
-		stopCh:   make(chan bool, 1),
 		dtCh:     make(chan procData),
 		origDtCh: make(chan *investapi.MarketDataResponse),
 		savMap:   make(map[string]*collections.TList[decimal.Decimal]),

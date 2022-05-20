@@ -1,6 +1,7 @@
 package robot
 
 import (
+	"context"
 	"go.uber.org/zap"
 	"invest-robot/domain"
 	"invest-robot/dto"
@@ -32,7 +33,7 @@ func (t *TradeProdAPI) GetActiveAlgorithms() (*dto.AlgorithmsResponse, error) {
 	return &dto.AlgorithmsResponse{Algorithms: res}, nil
 }
 
-func (t *TradeProdAPI) Trade(req *dto.CreateAlgorithmRequest) (*dto.TradeStartResponse, error) {
+func (t *TradeProdAPI) Trade(req *dto.CreateAlgorithmRequest, ctx context.Context) (*dto.TradeStartResponse, error) {
 	t.logger.Info("Requested new algorithm ", req)
 	algDm := domain.AlgorithmFromDto(req)
 	if err := t.algRep.Save(algDm); err != nil {
@@ -49,7 +50,7 @@ func (t *TradeProdAPI) Trade(req *dto.CreateAlgorithmRequest) (*dto.TradeStartRe
 	if err = t.trader.AddSubscription(sub); err != nil {
 		return nil, err
 	}
-	if err = alg.Go(); err != nil {
+	if err = alg.Go(ctx); err != nil {
 		t.logger.Error("Error while starting algorithm, check routine leaking")
 		return nil, err
 	}

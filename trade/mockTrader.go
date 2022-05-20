@@ -1,6 +1,7 @@
 package trade
 
 import (
+	"context"
 	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
 	"invest-robot/domain"
@@ -20,6 +21,7 @@ type MockTrader struct {
 	figiCurrency map[string]string       //currency to instrument figi relation
 	figiHist     map[string][]histRecord //history of each figi - to convenience interpolation
 	logger       *zap.SugaredLogger
+	ctx          context.Context
 }
 
 type histRecord struct {
@@ -37,7 +39,8 @@ type mockTraderData struct {
 	SellOper  uint
 }
 
-func (t *MockTrader) Go() {
+func (t *MockTrader) Go(ctx context.Context) {
+	t.ctx = ctx
 	go t.procBg()
 }
 
@@ -61,36 +64,47 @@ func (t *MockTrader) procBg() {
 		SellOper:  0,
 	}
 
-	for act := range t.sub.AChan {
-		action := act.Action
-		trDat.LastTime = action.RetrievedAt
-		actCurrency, exst := t.figiCurrency[action.InstrFigi]
-		if !exst {
-			t.logger.Warnf("Requested unexpected figi: %s", action.InstrFigi)
-			t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
-			continue
-		}
-		opInfo := trmodel.OpInfo{Currency: actCurrency}
-		action.Currency = actCurrency
-		opInfo.Lim = act.GetCurrLimit(actCurrency)
-		opInfo.PosInLot = t.lots[action.InstrFigi]
-		var err error
-		opInfo.PosPrice, err = t.calcPrice(action.InstrFigi, action.RetrievedAt)
-		if err != nil {
-			t.logger.Errorf("Error while calculating figi price: %s", err)
-			t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
-			continue
-		}
-		if opInfo.Lim.IsZero() || opInfo.PosInLot == 0 || opInfo.PosPrice.IsZero() {
-			t.logger.Warnf("Limit or lot price is zero; figi: %s; limit: %s; pos in lot: %d;lot price: %s",
-				action.InstrFigi, opInfo.Lim, opInfo.PosInLot, opInfo.PosPrice)
-			t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
-			continue
-		}
-		if action.Direction == domain.BUY {
-			t.procBuy(opInfo, action, &trDat)
-		} else {
-			t.procSell(opInfo, action, &trDat)
+OUT:
+	for {
+		select {
+		case <-t.ctx.Done():
+			t.logger.Info("Mock trader cancel request received...")
+			break OUT
+		case act, ok := <-t.sub.AChan:
+			if !ok {
+				t.logger.Info("Incoming stream closed, stopping")
+				break OUT
+			}
+			action := act.Action
+			trDat.LastTime = action.RetrievedAt
+			actCurrency, exst := t.figiCurrency[action.InstrFigi]
+			if !exst {
+				t.logger.Warnf("Requested unexpected figi: %s", action.InstrFigi)
+				t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
+				continue
+			}
+			opInfo := trmodel.OpInfo{Currency: actCurrency}
+			action.Currency = actCurrency
+			opInfo.Lim = act.GetCurrLimit(actCurrency)
+			opInfo.PosInLot = t.lots[action.InstrFigi]
+			var err error
+			opInfo.PosPrice, err = t.calcPrice(action.InstrFigi, action.RetrievedAt)
+			if err != nil {
+				t.logger.Errorf("Error while calculating figi price: %s", err)
+				t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
+				continue
+			}
+			if opInfo.Lim.IsZero() || opInfo.PosInLot == 0 || opInfo.PosPrice.IsZero() {
+				t.logger.Warnf("Limit or lot price is zero; figi: %s; limit: %s; pos in lot: %d;lot price: %s",
+					action.InstrFigi, opInfo.Lim, opInfo.PosInLot, opInfo.PosPrice)
+				t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
+				continue
+			}
+			if action.Direction == domain.BUY {
+				t.procBuy(opInfo, action, &trDat)
+			} else {
+				t.procSell(opInfo, action, &trDat)
+			}
 		}
 	}
 

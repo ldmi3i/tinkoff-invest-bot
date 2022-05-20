@@ -1,6 +1,7 @@
 package trade
 
 import (
+	"context"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
@@ -18,7 +19,7 @@ import (
 type Trader interface {
 	AddSubscription(sub *stmodel.Subscription) error
 	RemoveSubscription(id uint) error
-	Go()
+	Go(ctx context.Context)
 }
 
 type BaseTrader struct {
@@ -27,6 +28,7 @@ type BaseTrader struct {
 	actionRep repository.ActionRepository
 	subs      collections.SyncMap[uint, *stmodel.Subscription]
 	orders    collections.SyncMap[string, *domain.Action]
+	ctx       context.Context
 
 	algoCh chan *stmodel.ActionReq
 	logger *zap.SugaredLogger
@@ -62,7 +64,7 @@ func (t *BaseTrader) checkOrdersBg() {
 				AccountId: action.AccountID,
 				OrderId:   entry.Key,
 			}
-			state, err := t.infoSrv.GetOrderState(&req)
+			state, err := t.infoSrv.GetOrderState(&req, t.ctx)
 			if err != nil {
 				t.logger.Errorf("Error checking order state %+v: %s", req, err)
 				continue
@@ -117,7 +119,7 @@ func (t *BaseTrader) checkOrdersBg() {
 						AccountId: action.AccountID,
 						OrderId:   entry.Key,
 					}
-					cResp, err := t.tradeSrv.CancelOrder(&cReq)
+					cResp, err := t.tradeSrv.CancelOrder(&cReq, t.ctx)
 					if err != nil {
 						t.logger.Error("Error while canceling order: ")
 						continue
@@ -179,7 +181,7 @@ func (t *BaseTrader) preprocessAction(req *stmodel.ActionReq, subscription *stmo
 		return nil, false
 	}
 	//Retrieving instrument for order
-	instrInfo, err := t.infoSrv.GetInstrumentInfoByFigi(action.InstrFigi)
+	instrInfo, err := t.infoSrv.GetInstrumentInfoByFigi(action.InstrFigi, t.ctx)
 	if err != nil {
 		t.logger.Error("Error while requesting instrument info. Canceling operation, updating status...", err)
 		t.setActionStatus(action, domain.FAILED, "Error getting instrument info")
@@ -218,7 +220,7 @@ func (t *BaseTrader) preprocessAction(req *stmodel.ActionReq, subscription *stmo
 		return nil, false
 	}
 	//Retrieve last single lot price
-	prices, err := t.infoSrv.GetLastPrices([]string{action.InstrFigi})
+	prices, err := t.infoSrv.GetLastPrices([]string{action.InstrFigi}, t.ctx)
 	if err != nil || prices.GetByFigi(action.InstrFigi) == nil {
 		t.logger.Error("Error retrieving last prices by ", instrInfo.TradingStatus)
 		t.setActionStatus(action, domain.FAILED, "Error getting price by figi")
@@ -251,7 +253,7 @@ func (t *BaseTrader) procBuy(opInfo *trmodel.OpInfo, action *domain.Action, sub 
 	lotAmount := operNum.IntPart()
 	//Get real available money amount using GetPositions request
 	posReq := tapi.PositionsRequest{AccountId: action.AccountID}
-	positions, err := t.infoSrv.GetPositions(&posReq)
+	positions, err := t.infoSrv.GetPositions(&posReq, t.ctx)
 	if err != nil {
 		t.logger.Error("Error getting positions ", err)
 		t.setActionStatus(action, domain.FAILED, "Error while getting positions")
@@ -283,7 +285,7 @@ func (t *BaseTrader) procBuy(opInfo *trmodel.OpInfo, action *domain.Action, sub 
 		req.OrderType = tapi.OrderTypeMarket
 	}
 	action.OrderId = orderId
-	order, err := t.tradeSrv.PostOrder(&req)
+	order, err := t.tradeSrv.PostOrder(&req, t.ctx)
 	if err != nil {
 		t.logger.Errorf("Error posting sell order %+v: %s, response: %v", req, err, order)
 		t.setActionStatus(action, domain.FAILED, "Error while posting buy order")
@@ -323,7 +325,7 @@ func (t *BaseTrader) procSell(opInfo *trmodel.OpInfo, action *domain.Action, sub
 		req.OrderType = tapi.OrderTypeMarket
 	}
 	action.OrderId = orderId
-	order, err := t.tradeSrv.PostOrder(&req)
+	order, err := t.tradeSrv.PostOrder(&req, t.ctx)
 	if err != nil {
 		t.logger.Errorf("Error posting sell order %+v: %s, response: %v", req, err, order)
 		t.setActionStatus(action, domain.FAILED, "Error while posting buy order")

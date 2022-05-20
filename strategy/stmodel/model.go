@@ -1,6 +1,7 @@
 package stmodel
 
 import (
+	"context"
 	"github.com/shopspring/decimal"
 	"invest-robot/domain"
 )
@@ -24,7 +25,7 @@ type Algorithm interface {
 	//GetAlgorithm returns algorithm data which used as base
 	GetAlgorithm() *domain.Algorithm
 	//Go starts algorithm running in background
-	Go() error
+	Go(ctx context.Context) error
 	//Stop running algorithm
 	Stop() error
 }

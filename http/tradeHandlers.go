@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"invest-robot/dto"
@@ -58,8 +59,9 @@ func (h *DefaultTradeHandler) trade(c *gin.Context, api robot.TradeAPI) {
 		c.JSON(http.StatusBadRequest, err.Error())
 		return
 	}
+	context.Background()
 	h.logger.Infof("Start sandbox trading: %+v", req)
-	stat, err := api.Trade(&req)
+	stat, err := api.Trade(&req, context.Background())
 	if err != nil {
 		h.logger.Errorf("Error while analyzing history:\n%s", err)
 		c.JSON(http.StatusInternalServerError, err.Error())

@@ -38,7 +38,7 @@ func (h *DefaultHistoryHandler) LoadHistory(c *gin.Context) {
 		return
 	}
 	h.logger.Infof("Load history: %+v", req)
-	err = h.api.LoadHistory(req.Figis, req.Interval, time.Unix(req.StartTime, 0), time.Unix(req.EndTime, 0))
+	err = h.api.LoadHistory(req.Figis, req.Interval, time.Unix(req.StartTime, 0), time.Unix(req.EndTime, 0), c.Request.Context())
 	if err != nil {
 		h.logger.Errorf("Error while loading history:\n%s", err)
 		c.JSON(http.StatusInternalServerError, err.Error())
@@ -54,7 +54,7 @@ func (h *DefaultHistoryHandler) AnalyzeHistory(c *gin.Context) {
 		return
 	}
 	h.logger.Infof("Analyze history: %+v", req)
-	stat, err := h.api.AnalyzeAlgo(&req)
+	stat, err := h.api.AnalyzeAlgo(&req, c.Request.Context())
 	if err != nil {
 		h.logger.Errorf("Error while analyzing history:\n%s", err)
 		c.JSON(http.StatusInternalServerError, err.Error())
@@ -71,7 +71,7 @@ func (h *DefaultHistoryHandler) AnalyzeHistoryInRange(c *gin.Context) {
 		return
 	}
 	h.logger.Infof("Analyze history: %+v", req)
-	stat, err := h.api.AnalyzeAlgoInRange(&req)
+	stat, err := h.api.AnalyzeAlgoInRange(&req, c.Request.Context())
 	if err != nil {
 		h.logger.Errorf("Error while analyzing history:\n%s", err)
 		c.JSON(http.StatusInternalServerError, err.Error())
