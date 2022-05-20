@@ -53,6 +53,13 @@ func (sm *SyncMap[T1, T2]) GetSlice() []*MapEntry[T1, T2] {
 	return sl
 }
 
+//Clear clears all entries by recreating internal map
+func (sm *SyncMap[T1, T2]) Clear() {
+	sm.mx.Lock()
+	defer sm.mx.Unlock()
+	sm.m = make(map[T1]T2, 0)
+}
+
 func NewSyncMap[T1 comparable, T2 any]() SyncMap[T1, T2] {
 	return SyncMap[T1, T2]{
 		m: make(map[T1]T2, 0),

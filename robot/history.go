@@ -36,7 +36,7 @@ func (h *DefaultHistoryAPI) LoadHistory(figis []string, ivl investapi.CandleInte
 	if err != nil {
 		return err
 	}
-	if err = h.histRep.SaveAll(history); err != nil {
+	if err = h.histRep.ClearAndSaveAll(history); err != nil {
 		return err
 	}
 	h.logger.Infof("Load history completed. Loaded %d entries", len(history))

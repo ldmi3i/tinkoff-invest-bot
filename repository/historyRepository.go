@@ -1,23 +1,27 @@
 package repository
 
 import (
+	"fmt"
 	"gorm.io/gorm"
+	"invest-robot/collections"
 	"invest-robot/domain"
 )
 
 type HistoryRepository interface {
-	SaveAll(history []domain.History) error
+	ClearAndSaveAll(history []domain.History) error
 	FindAll() ([]domain.History, error)
 	FindAllByFigis(figis []string) ([]domain.History, error)
 }
 
 type PgHistoryRepository struct {
-	db *gorm.DB
+	db                  *gorm.DB
+	findAllByFigisCache collections.SyncMap[string, []domain.History]
 }
 
-func (h PgHistoryRepository) SaveAll(history []domain.History) error {
+func (h PgHistoryRepository) ClearAndSaveAll(history []domain.History) error {
 	h.db.Exec("DELETE FROM history")
 	h.db.Create(history)
+	h.findAllByFigisCache.Clear()
 	return nil
 }
 
@@ -28,11 +32,16 @@ func (h PgHistoryRepository) FindAll() ([]domain.History, error) {
 }
 
 func (h PgHistoryRepository) FindAllByFigis(figis []string) ([]domain.History, error) {
-	var hist []domain.History
+	strKey := fmt.Sprint(figis)
+	hist, ok := h.findAllByFigisCache.Get(strKey)
+	if ok {
+		return hist, nil
+	}
 	h.db.Where("figi in ?", figis).Order("time").Find(&hist)
+	h.findAllByFigisCache.Put(strKey, hist)
 	return hist, nil
 }
 
 func NewHistoryRepository(db *gorm.DB) HistoryRepository {
-	return PgHistoryRepository{db}
+	return PgHistoryRepository{db, collections.NewSyncMap[string, []domain.History]()}
 }
