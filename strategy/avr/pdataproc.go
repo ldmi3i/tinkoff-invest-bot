@@ -17,16 +17,17 @@ import (
 )
 
 type DataProcProd struct {
-	stream   investapi.MarketDataStreamService_MarketDataStreamClient
-	algo     *domain.Algorithm
-	infoSrv  service.InfoSrv
-	algoId   uint
-	params   map[string]string
-	figis    []string
-	ctx      context.Context
-	dtCh     chan procData
-	origDtCh chan *investapi.MarketDataResponse
-	trackId  string
+	stream     investapi.MarketDataStreamService_MarketDataStreamClient
+	algo       *domain.Algorithm
+	infoSrv    service.InfoSrv
+	algoId     uint
+	params     map[string]string
+	figis      []string
+	ctx        context.Context
+	dtCh       chan procData
+	origDtCh   chan *investapi.MarketDataResponse
+	trackId    string
+	restartMin int
 
 	longDur int
 	savMap  map[string]*collections.TList[decimal.Decimal]
@@ -149,10 +150,16 @@ func (d *DataProcProd) processDataInBg() {
 				return
 			}
 
-			d.logger.Info("Trying to resubscribe to channel")
+			d.logger.Infof("Trying to re-create channel after %d min", d.restartMin)
+			time.Sleep(3 * time.Minute)
+			d.stream, err = d.infoSrv.GetDataStream(d.ctx)
+			if err != nil {
+				d.logger.Error("Recreate stream failed with error: ", err, " Stopping processor...")
+				return
+			}
 			err = d.subscribe()
 			if err != nil {
-				d.logger.Error("Subscription failed with error: ", err, " Stopping processor...")
+				d.logger.Error("Subscribe new stream failed with error: ", err, " Stopping processor...")
 				return
 			}
 		}
@@ -246,15 +253,16 @@ func (d *DataProcProd) Stop() error {
 
 func newDataProc(req *domain.Algorithm, infoSrv service.InfoSrv, logger *zap.SugaredLogger) (DataProc, error) {
 	return &DataProcProd{
-		algo:     req,
-		infoSrv:  infoSrv,
-		algoId:   req.ID,
-		params:   domain.ParamsToMap(req.Params),
-		figis:    req.Figis,
-		dtCh:     make(chan procData),
-		origDtCh: make(chan *investapi.MarketDataResponse),
-		savMap:   make(map[string]*collections.TList[decimal.Decimal]),
-		lavMap:   make(map[string]*collections.TList[decimal.Decimal]),
-		logger:   logger,
+		algo:       req,
+		infoSrv:    infoSrv,
+		algoId:     req.ID,
+		params:     domain.ParamsToMap(req.Params),
+		figis:      req.Figis,
+		dtCh:       make(chan procData),
+		origDtCh:   make(chan *investapi.MarketDataResponse),
+		savMap:     make(map[string]*collections.TList[decimal.Decimal]),
+		lavMap:     make(map[string]*collections.TList[decimal.Decimal]),
+		logger:     logger,
+		restartMin: 3,
 	}, nil
 }
