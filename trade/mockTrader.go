@@ -165,10 +165,15 @@ func (t MockTrader) calcMoneyStat(trDat *mockTraderData) dto.HistStatResponse {
 	//calculate money values according to current rate
 	for figi, amount := range trDat.ResInstr {
 		if amount != 0 {
-			lotPrice, err := t.calcPrice(figi, trDat.LastTime)
+			posPrice, err := t.calcPrice(figi, trDat.LastTime)
 			if err != nil {
 				t.logger.Errorf("Error whle calculating price; figi: %s; time: %s", figi, trDat.LastTime)
 			}
+			posInLot, ok := t.lots[figi]
+			if !ok {
+				posInLot = 1
+			}
+			lotPrice := posPrice.Mul(decimal.NewFromInt(posInLot))
 			currency, exst := t.figiCurrency[figi]
 			if exst && err == nil {
 				trDat.ResAmount[currency] = trDat.ResAmount[currency].Add(lotPrice.Mul(decimal.NewFromInt(amount)))
@@ -211,7 +216,6 @@ func (t MockTrader) calcPrice(figi string, tm time.Time) (decimal.Decimal, error
 	uppVal := decimal.Zero
 	lwrTm := time.Time{}
 	lwrVal := decimal.Zero
-	//TODO make hist sorted and use binary search
 	for _, hRec := range hist {
 		if hRec.Time.Equal(tm) {
 			return hRec.Price, nil
