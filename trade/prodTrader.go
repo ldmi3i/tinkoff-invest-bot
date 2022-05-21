@@ -10,18 +10,18 @@ import (
 	"invest-robot/strategy/stmodel"
 )
 
-type ProdApiTrader struct {
+type ProdTrader struct {
 	*BaseTrader
 }
 
-func (t *ProdApiTrader) Go(ctx context.Context) {
+func (t *ProdTrader) Go(ctx context.Context) {
 	t.ctx = ctx
 	go t.checkOrdersBg()
 	go t.actionProcBg()
 }
 
 func NewProdTrader(infoSrv service.InfoSrv, tradeSrv service.TradeService, actionRep repository.ActionRepository, logger *zap.SugaredLogger) Trader {
-	return &ProdApiTrader{
+	return &ProdTrader{
 		&BaseTrader{
 			infoSrv:   infoSrv,
 			tradeSrv:  tradeSrv,
