@@ -7,16 +7,17 @@ import (
 	"invest-robot/dto"
 )
 
+//Algorithm represents full algorithm configuration
 type Algorithm struct {
 	gorm.Model
-	Strategy    string
-	AccountId   string
-	Figis       pq.StringArray `gorm:"type:text[]"`
-	MoneyLimits []*MoneyLimit
-	Params      []*Param
-	CtxParams   []*CtxParam
-	Actions     []*Action
-	IsActive    bool
+	Strategy    string         //Name of strategy
+	AccountId   string         //Account identity
+	Figis       pq.StringArray `gorm:"type:text[]"` //List of figis to operate
+	MoneyLimits []*MoneyLimit  //OneToMany List of money limits to operate
+	Params      []*Param       //OneToMany List of algorithm parameters
+	CtxParams   []*CtxParam    //OneToMany Context algorithm parameters required to save/restore state TODO not implemeted!
+	Actions     []*Action      //OneToMany List of actions made by algorithm
+	IsActive    bool           //Algorithm activity state, if running - true, else - false
 }
 
 func (alg *Algorithm) ToDto() *dto.AlgorithmResponse {
@@ -37,6 +38,7 @@ func (alg *Algorithm) ToDto() *dto.AlgorithmResponse {
 	}
 }
 
+//Param represents algorithm parametrization by key/value map
 type Param struct {
 	ID          uint `gorm:"primaryKey"`
 	AlgorithmID uint
@@ -44,6 +46,7 @@ type Param struct {
 	Value       string
 }
 
+//CtxParam represents algorithm current calculation state with key/value map
 type CtxParam struct {
 	ID          uint `gorm:"primaryKey"`
 	AlgorithmID uint
@@ -51,6 +54,7 @@ type CtxParam struct {
 	Value       string
 }
 
+//MoneyLimit represents limits on the use of money
 type MoneyLimit struct {
 	ID          uint `gorm:"primaryKey"`
 	AlgorithmID uint
@@ -73,6 +77,8 @@ func ParamsToMap(params []*Param) map[string]string {
 	return res
 }
 
+//CopyNoParam is utility method for parameter variation.
+//Copies algorithm without parameters
 func (alg *Algorithm) CopyNoParam() *Algorithm {
 	return &Algorithm{
 		Strategy:    alg.Strategy,

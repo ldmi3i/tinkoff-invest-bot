@@ -27,7 +27,7 @@ const (
 	MARKET  OrderType = "MARKET"
 )
 
-//Action represents data through all trade order steps requested by algorithm
+//Action represents data used in all trade order steps. Algorithm initiate action request to trader.
 //Some data must be populated from algorithm, other filled by trader
 //each field has a mark when it must be filled
 type Action struct {

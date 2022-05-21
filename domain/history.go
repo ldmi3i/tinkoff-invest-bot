@@ -7,14 +7,16 @@ import (
 	"time"
 )
 
+//History represents one row of downloaded history. I.e. candle parameters.
+//Constructs from Candle response from API
 type History struct {
 	ID    uint `gorm:"primaryKey"`
 	Figi  string
-	Open  decimal.Decimal `gorm:"type:numeric"`
-	Low   decimal.Decimal `gorm:"type:numeric"`
-	High  decimal.Decimal `gorm:"type:numeric"`
-	Close decimal.Decimal `gorm:"type:numeric"`
-	Time  time.Time
+	Open  decimal.Decimal `gorm:"type:numeric"` //Open price
+	Low   decimal.Decimal `gorm:"type:numeric"` //Lowest price
+	High  decimal.Decimal `gorm:"type:numeric"` //Highest price
+	Close decimal.Decimal `gorm:"type:numeric"` //Close price
+	Time  time.Time       //Timestamp of
 }
 
 func FromCandle(c *investapi.Candle) History {
