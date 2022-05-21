@@ -15,7 +15,6 @@ type TradeProdAPI struct {
 	*BaseTradeAPI
 	infoSrv    service.InfoSrv
 	algFactory strategy.AlgFactory
-	algRep     repository.AlgoRepository
 	trader     trade.Trader
 	logger     *zap.SugaredLogger
 }
@@ -54,12 +53,11 @@ func (t *TradeProdAPI) Trade(req *dto.CreateAlgorithmRequest, ctx context.Contex
 		t.logger.Error("Error while starting algorithm, check routine leaking")
 		return nil, err
 	}
-	//TODO check is enough funds for any of requested figis?
 	return &dto.TradeStartResponse{Info: "Successfully started", AlgorithmID: algDm.ID}, nil
 }
 
 func NewTradeProdAPI(infoSrv service.InfoSrv, algFactory strategy.AlgFactory, algRep repository.AlgoRepository,
 	trader trade.Trader, logger *zap.SugaredLogger) TradeAPI {
-	baseAPI := BaseTradeAPI{algFactory: algFactory, logger: logger}
-	return &TradeProdAPI{&baseAPI, infoSrv, algFactory, algRep, trader, logger}
+	baseAPI := BaseTradeAPI{algFactory: algFactory, logger: logger, algRep: algRep}
+	return &TradeProdAPI{&baseAPI, infoSrv, algFactory, trader, logger}
 }

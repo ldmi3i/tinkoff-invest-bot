@@ -30,6 +30,12 @@ services:
       GRPC_GO_LOG_SEVERITY_LEVEL: "info"
       GRPC_GO_LOG_VERBOSITY_LEVEL: "99"
       TIN_TOKEN: "t.RpF5XdaXJIta0w9DPQ5Nn7uuIASL7ASH6C7MhYQuCutc3Fxoedc9DPFDwI4npN-WQKdSQZjOBBS27rhn9-oCzw"
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 60s
     depends_on:
       - postgres-db
     links:

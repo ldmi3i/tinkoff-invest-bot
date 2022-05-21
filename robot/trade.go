@@ -4,6 +4,7 @@ import (
 	"context"
 	"go.uber.org/zap"
 	"invest-robot/dto"
+	"invest-robot/repository"
 	"invest-robot/strategy"
 )
 
@@ -15,6 +16,7 @@ type TradeAPI interface {
 
 type BaseTradeAPI struct {
 	algFactory strategy.AlgFactory
+	algRep     repository.AlgoRepository
 	logger     *zap.SugaredLogger
 }
 
@@ -26,5 +28,9 @@ func (ta *BaseTradeAPI) StopAlgorithm(req *dto.StopAlgorithmRequest) (*dto.StopA
 	if err := alg.Stop(); err != nil {
 		return nil, err
 	}
-	return &dto.StopAlgorithmResponse{IsStopped: true}, nil
+	alg.GetAlgorithm()
+	if err := ta.algRep.SetActiveStatus(req.AlgorithmId, false); err != nil {
+		ta.logger.Error("Error while setting algorithm to inactive in db! ", err)
+	}
+	return &dto.StopAlgorithmResponse{IsStopped: true, Info: "Stopped successfully"}, nil
 }
