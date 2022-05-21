@@ -2,13 +2,13 @@ package service
 
 import (
 	"context"
-	"invest-robot/dto/tapi"
+	"invest-robot/dto/dtotapi"
 )
 
 type TradeService interface {
-	PostOrder(req *tapi.PostOrderRequest, ctx context.Context) (*tapi.PostOrderResponse, error)
+	PostOrder(req *dtotapi.PostOrderRequest, ctx context.Context) (*dtotapi.PostOrderResponse, error)
 
-	GetOrderStatus(req *tapi.GetOrderStateRequest, ctx context.Context) (*tapi.GetOrderStateResponse, error)
+	GetOrderStatus(req *dtotapi.GetOrderStateRequest, ctx context.Context) (*dtotapi.GetOrderStateResponse, error)
 
-	CancelOrder(req *tapi.CancelOrderRequest, ctx context.Context) (*tapi.CancelOrderResponse, error)
+	CancelOrder(req *dtotapi.CancelOrderRequest, ctx context.Context) (*dtotapi.CancelOrderResponse, error)
 }

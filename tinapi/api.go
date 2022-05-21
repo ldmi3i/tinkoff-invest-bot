@@ -6,7 +6,7 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"invest-robot/domain"
-	"invest-robot/dto/tapi"
+	"invest-robot/dto/dtotapi"
 	"invest-robot/helper"
 	investapi "invest-robot/tapigen"
 	"log"
@@ -18,21 +18,21 @@ type Api interface {
 	GetHistorySorted(figis []string, ivl investapi.CandleInterval, startDate time.Time, endDate time.Time, ctx context.Context) ([]domain.History, error)
 	MarketDataStream(ctx context.Context) (investapi.MarketDataStreamService_MarketDataStreamClient, error)
 	GetAllShares(ctx context.Context) (*investapi.SharesResponse, error)
-	GetInstrumentInfo(req *tapi.InstrumentRequest, ctx context.Context) (*tapi.InstrumentResponse, error)
-	GetLastPrices(req *tapi.LastPricesRequest, ctx context.Context) (*tapi.LastPricesResponse, error)
+	GetInstrumentInfo(req *dtotapi.InstrumentRequest, ctx context.Context) (*dtotapi.InstrumentResponse, error)
+	GetLastPrices(req *dtotapi.LastPricesRequest, ctx context.Context) (*dtotapi.LastPricesResponse, error)
 	GetOrderStream(accounts []string, ctx context.Context) (investapi.OrdersStreamService_TradesStreamClient, error)
 
-	PostSandboxOrder(req *tapi.PostOrderRequest, ctx context.Context) (*tapi.PostOrderResponse, error)
-	PostProdOrder(req *tapi.PostOrderRequest, ctx context.Context) (*tapi.PostOrderResponse, error)
+	PostSandboxOrder(req *dtotapi.PostOrderRequest, ctx context.Context) (*dtotapi.PostOrderResponse, error)
+	PostProdOrder(req *dtotapi.PostOrderRequest, ctx context.Context) (*dtotapi.PostOrderResponse, error)
 
-	CancelSandboxOrder(req *tapi.CancelOrderRequest, ctx context.Context) (*tapi.CancelOrderResponse, error)
-	CancelProdOrder(req *tapi.CancelOrderRequest, ctx context.Context) (*tapi.CancelOrderResponse, error)
+	CancelSandboxOrder(req *dtotapi.CancelOrderRequest, ctx context.Context) (*dtotapi.CancelOrderResponse, error)
+	CancelProdOrder(req *dtotapi.CancelOrderRequest, ctx context.Context) (*dtotapi.CancelOrderResponse, error)
 
-	GetSandboxOrderState(req *tapi.GetOrderStateRequest, ctx context.Context) (*tapi.GetOrderStateResponse, error)
-	GetProdOrderState(req *tapi.GetOrderStateRequest, ctx context.Context) (*tapi.GetOrderStateResponse, error)
+	GetSandboxOrderState(req *dtotapi.GetOrderStateRequest, ctx context.Context) (*dtotapi.GetOrderStateResponse, error)
+	GetProdOrderState(req *dtotapi.GetOrderStateRequest, ctx context.Context) (*dtotapi.GetOrderStateResponse, error)
 
-	GetSandboxPositions(req *tapi.PositionsRequest, ctx context.Context) (*tapi.PositionsResponse, error)
-	GetProdPositions(req *tapi.PositionsRequest, ctx context.Context) (*tapi.PositionsResponse, error)
+	GetSandboxPositions(req *dtotapi.PositionsRequest, ctx context.Context) (*dtotapi.PositionsResponse, error)
+	GetProdPositions(req *dtotapi.PositionsRequest, ctx context.Context) (*dtotapi.PositionsResponse, error)
 }
 
 type DefaultTinApi struct {
@@ -110,96 +110,96 @@ func (t *DefaultTinApi) GetAllShares(ctx context.Context) (*investapi.SharesResp
 	return shares, nil
 }
 
-func (t *DefaultTinApi) GetInstrumentInfo(req *tapi.InstrumentRequest, ctx context.Context) (*tapi.InstrumentResponse, error) {
+func (t *DefaultTinApi) GetInstrumentInfo(req *dtotapi.InstrumentRequest, ctx context.Context) (*dtotapi.InstrumentResponse, error) {
 	ctxA := contextWithAuth(ctx)
 	instrInfo, err := t.instrCl.GetInstrumentBy(ctxA, req.ToTinApi())
 	if err != nil {
 		return nil, err
 	}
-	return tapi.InstrumentResponseToDto(instrInfo), nil
+	return dtotapi.InstrumentResponseToDto(instrInfo), nil
 }
 
-func (t *DefaultTinApi) GetLastPrices(req *tapi.LastPricesRequest, ctx context.Context) (*tapi.LastPricesResponse, error) {
+func (t *DefaultTinApi) GetLastPrices(req *dtotapi.LastPricesRequest, ctx context.Context) (*dtotapi.LastPricesResponse, error) {
 	ctxA := contextWithAuth(ctx)
 	prices, err := t.marketDatCl.GetLastPrices(ctxA, req.ToTinApi())
 	if err != nil {
 		return nil, err
 	}
-	return tapi.LastPricesResponseToDto(prices), nil
+	return dtotapi.LastPricesResponseToDto(prices), nil
 }
 
-func (t *DefaultTinApi) PostSandboxOrder(req *tapi.PostOrderRequest, ctx context.Context) (*tapi.PostOrderResponse, error) {
+func (t *DefaultTinApi) PostSandboxOrder(req *dtotapi.PostOrderRequest, ctx context.Context) (*dtotapi.PostOrderResponse, error) {
 	ctxA := contextWithAuth(ctx)
 	log.Println("Post order request:", req.ToTinApi())
 	order, err := t.sandboxCl.PostSandboxOrder(ctxA, req.ToTinApi())
 	if err != nil {
 		return nil, err
 	}
-	return tapi.PostOrderResponseToDto(order), nil
+	return dtotapi.PostOrderResponseToDto(order), nil
 }
 
-func (t *DefaultTinApi) GetSandboxOrderState(req *tapi.GetOrderStateRequest, ctx context.Context) (*tapi.GetOrderStateResponse, error) {
+func (t *DefaultTinApi) GetSandboxOrderState(req *dtotapi.GetOrderStateRequest, ctx context.Context) (*dtotapi.GetOrderStateResponse, error) {
 	ctxA := contextWithAuth(ctx)
 	resp, err := t.sandboxCl.GetSandboxOrderState(ctxA, req.ToTinApi())
 	if err != nil {
 		return nil, err
 	}
-	return tapi.OrderStateResponseToDto(resp), nil
+	return dtotapi.OrderStateResponseToDto(resp), nil
 }
 
-func (t *DefaultTinApi) GetProdOrderState(req *tapi.GetOrderStateRequest, ctx context.Context) (*tapi.GetOrderStateResponse, error) {
+func (t *DefaultTinApi) GetProdOrderState(req *dtotapi.GetOrderStateRequest, ctx context.Context) (*dtotapi.GetOrderStateResponse, error) {
 	ctxA := contextWithAuth(ctx)
 	resp, err := t.orderCl.GetOrderState(ctxA, req.ToTinApi())
 	if err != nil {
 		return nil, err
 	}
-	return tapi.OrderStateResponseToDto(resp), nil
+	return dtotapi.OrderStateResponseToDto(resp), nil
 }
 
-func (t *DefaultTinApi) PostProdOrder(req *tapi.PostOrderRequest, ctx context.Context) (*tapi.PostOrderResponse, error) {
+func (t *DefaultTinApi) PostProdOrder(req *dtotapi.PostOrderRequest, ctx context.Context) (*dtotapi.PostOrderResponse, error) {
 	ctxA := contextWithAuth(ctx)
 	t.logger.Infof("Posting prod order %+v", req.ToTinApi())
 	order, err := t.orderCl.PostOrder(ctxA, req.ToTinApi())
 	if err != nil {
 		return nil, err
 	}
-	return tapi.PostOrderResponseToDto(order), nil
+	return dtotapi.PostOrderResponseToDto(order), nil
 }
 
-func (t *DefaultTinApi) CancelSandboxOrder(req *tapi.CancelOrderRequest, ctx context.Context) (*tapi.CancelOrderResponse, error) {
+func (t *DefaultTinApi) CancelSandboxOrder(req *dtotapi.CancelOrderRequest, ctx context.Context) (*dtotapi.CancelOrderResponse, error) {
 	ctxA := contextWithAuth(ctx)
 	resp, err := t.sandboxCl.CancelSandboxOrder(ctxA, req.ToTinApi())
 	if err != nil {
 		return nil, err
 	}
-	return tapi.CancelOrderResponseToDto(resp), nil
+	return dtotapi.CancelOrderResponseToDto(resp), nil
 }
 
-func (t *DefaultTinApi) CancelProdOrder(req *tapi.CancelOrderRequest, ctx context.Context) (*tapi.CancelOrderResponse, error) {
+func (t *DefaultTinApi) CancelProdOrder(req *dtotapi.CancelOrderRequest, ctx context.Context) (*dtotapi.CancelOrderResponse, error) {
 	ctxA := contextWithAuth(ctx)
 	resp, err := t.orderCl.CancelOrder(ctxA, req.ToTinApi())
 	if err != nil {
 		return nil, err
 	}
-	return tapi.CancelOrderResponseToDto(resp), nil
+	return dtotapi.CancelOrderResponseToDto(resp), nil
 }
 
-func (t *DefaultTinApi) GetSandboxPositions(req *tapi.PositionsRequest, ctx context.Context) (*tapi.PositionsResponse, error) {
+func (t *DefaultTinApi) GetSandboxPositions(req *dtotapi.PositionsRequest, ctx context.Context) (*dtotapi.PositionsResponse, error) {
 	ctxA := contextWithAuth(ctx)
 	positions, err := t.sandboxCl.GetSandboxPositions(ctxA, req.ToTinApi())
 	if err != nil {
 		return nil, err
 	}
-	return tapi.PositionsResponseToDto(positions), nil
+	return dtotapi.PositionsResponseToDto(positions), nil
 }
 
-func (t *DefaultTinApi) GetProdPositions(req *tapi.PositionsRequest, ctx context.Context) (*tapi.PositionsResponse, error) {
+func (t *DefaultTinApi) GetProdPositions(req *dtotapi.PositionsRequest, ctx context.Context) (*dtotapi.PositionsResponse, error) {
 	ctxA := contextWithAuth(ctx)
 	positions, err := t.operationsCl.GetPositions(ctxA, req.ToTinApi())
 	if err != nil {
 		return nil, err
 	}
-	return tapi.PositionsResponseToDto(positions), nil
+	return dtotapi.PositionsResponseToDto(positions), nil
 }
 
 func (t *DefaultTinApi) GetOrderStream(accounts []string, ctx context.Context) (investapi.OrdersStreamService_TradesStreamClient, error) {

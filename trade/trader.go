@@ -8,7 +8,7 @@ import (
 	"go.uber.org/zap"
 	"invest-robot/collections"
 	"invest-robot/domain"
-	"invest-robot/dto/tapi"
+	"invest-robot/dto/dtotapi"
 	"invest-robot/repository"
 	"invest-robot/service"
 	"invest-robot/strategy/stmodel"
@@ -60,7 +60,7 @@ func (t *BaseTrader) checkOrdersBg() {
 		t.logger.Debug("Check orders, len ", len(sl))
 		for _, entry := range sl {
 			action := entry.Value
-			req := tapi.GetOrderStateRequest{
+			req := dtotapi.GetOrderStateRequest{
 				AccountId: action.AccountID,
 				OrderId:   entry.Key,
 			}
@@ -77,7 +77,7 @@ func (t *BaseTrader) checkOrdersBg() {
 				continue
 			}
 			switch state.ExecStatus {
-			case tapi.ExecutionReportStatusFill:
+			case dtotapi.ExecutionReportStatusFill:
 				action.Status = domain.SUCCESS
 				action.Info = "Order successfully completed"
 				action.TotalPrice = state.TotalPrice.Value
@@ -91,7 +91,7 @@ func (t *BaseTrader) checkOrdersBg() {
 				t.orders.Delete(entry.Key)
 				t.logger.Info("Order with id ", entry.Key, " completed")
 				sub.RChan <- &stmodel.ActionResp{Action: action}
-			case tapi.ExecutionReportStatusRejected:
+			case dtotapi.ExecutionReportStatusRejected:
 				action.Status = domain.FAILED
 				action.Info = "Order was rejected"
 				err = t.actionRep.Save(action)
@@ -101,7 +101,7 @@ func (t *BaseTrader) checkOrdersBg() {
 				t.orders.Delete(entry.Key)
 				t.logger.Infof("Order with id %s rejected", entry.Key)
 				sub.RChan <- &stmodel.ActionResp{Action: action}
-			case tapi.ExecutionReportStatusCancelled:
+			case dtotapi.ExecutionReportStatusCancelled:
 				action.Status = domain.CANCELED
 				action.Info = "Order was canceled"
 				err = t.actionRep.Save(action)
@@ -111,11 +111,11 @@ func (t *BaseTrader) checkOrdersBg() {
 				t.orders.Delete(entry.Key)
 				t.logger.Infof("Order with id %s rejected", entry.Key)
 				sub.RChan <- &stmodel.ActionResp{Action: action}
-			case tapi.ExecutionReportStatusPartiallyfill, tapi.ExecutionReportStatusNew:
+			case dtotapi.ExecutionReportStatusPartiallyfill, dtotapi.ExecutionReportStatusNew:
 				t.logger.Debugf("Check expiration time  %s, %s", action.ExpirationTime, time.Now())
 				if action.ExpirationTime.Before(time.Now()) {
 					t.logger.Infof("Canceling order %s by expiration time...", entry.Key)
-					cReq := tapi.CancelOrderRequest{
+					cReq := dtotapi.CancelOrderRequest{
 						AccountId: action.AccountID,
 						OrderId:   entry.Key,
 					}
@@ -252,7 +252,7 @@ func (t *BaseTrader) procBuy(opInfo *trmodel.OpInfo, action *domain.Action, sub 
 	//Set instrument amount to buy
 	lotAmount := operNum.IntPart()
 	//Get real available money amount using GetPositions request
-	posReq := tapi.PositionsRequest{AccountId: action.AccountID}
+	posReq := dtotapi.PositionsRequest{AccountId: action.AccountID}
 	positions, err := t.infoSrv.GetPositions(&posReq, t.ctx)
 	if err != nil {
 		t.logger.Error("Error getting positions ", err)
@@ -271,18 +271,18 @@ func (t *BaseTrader) procBuy(opInfo *trmodel.OpInfo, action *domain.Action, sub 
 	}
 	//Prepare request (currently only Market order type) and post order
 	orderId := uuid.New().String()
-	req := tapi.PostOrderRequest{
+	req := dtotapi.PostOrderRequest{
 		Figi:      action.InstrFigi,
 		PosNum:    lotAmount,
-		Direction: tapi.OrderDirectionBuy,
+		Direction: dtotapi.OrderDirectionBuy,
 		AccountId: action.AccountID,
 		OrderId:   orderId,
 	}
 	if action.OrderType == domain.LIMITED && !action.ReqPrice.IsZero() {
-		req.OrderType = tapi.OrderTypeLimit
+		req.OrderType = dtotapi.OrderTypeLimit
 		req.InstrPrice = t.normalizePriceDown(action.ReqPrice, opInfo.PriceStep)
 	} else {
-		req.OrderType = tapi.OrderTypeMarket
+		req.OrderType = dtotapi.OrderTypeMarket
 	}
 	action.OrderId = orderId
 	order, err := t.tradeSrv.PostOrder(&req, t.ctx)
@@ -311,18 +311,18 @@ func (t *BaseTrader) procSell(opInfo *trmodel.OpInfo, action *domain.Action, sub
 	}
 	//Posting market sell request
 	orderId := uuid.New().String()
-	req := tapi.PostOrderRequest{
+	req := dtotapi.PostOrderRequest{
 		Figi:      action.InstrFigi,
 		PosNum:    action.LotAmount,
-		Direction: tapi.OrderDirectionSell,
+		Direction: dtotapi.OrderDirectionSell,
 		AccountId: action.AccountID,
 		OrderId:   orderId,
 	}
 	if action.OrderType == domain.LIMITED && !action.ReqPrice.IsZero() {
-		req.OrderType = tapi.OrderTypeLimit
+		req.OrderType = dtotapi.OrderTypeLimit
 		req.InstrPrice = t.normalizePriceUp(action.ReqPrice, opInfo.PriceStep)
 	} else {
-		req.OrderType = tapi.OrderTypeMarket
+		req.OrderType = dtotapi.OrderTypeMarket
 	}
 	action.OrderId = orderId
 	order, err := t.tradeSrv.PostOrder(&req, t.ctx)

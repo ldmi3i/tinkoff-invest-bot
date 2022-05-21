@@ -1,4 +1,4 @@
-package tapi
+package dtotapi
 
 type SubscribeCandlesRequest struct {
 	Instruments []Instrument

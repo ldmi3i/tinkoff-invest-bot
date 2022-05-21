@@ -1,4 +1,4 @@
-package tapi
+package dtotapi
 
 import (
 	"github.com/shopspring/decimal"

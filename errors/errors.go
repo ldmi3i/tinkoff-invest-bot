@@ -29,6 +29,7 @@ func NewNotImplemented() error {
 	return NewUnexpectedError("Not implemented yet!")
 }
 
+// ConvertToError converts recovered type to error
 func ConvertToError(r interface{}) error {
 	switch tp := r.(type) {
 	case string:

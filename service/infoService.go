@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 	"invest-robot/domain"
-	"invest-robot/dto/tapi"
+	"invest-robot/dto/dtotapi"
 	"invest-robot/errors"
 	investapi "invest-robot/tapigen"
 	"invest-robot/tinapi"
@@ -17,11 +17,11 @@ type InfoSrv interface {
 	GetDataStream(ctx context.Context) (investapi.MarketDataStreamService_MarketDataStreamClient, error)
 	//GetAllShares return all shares, available for operating through API
 	GetAllShares(ctx context.Context) (*investapi.SharesResponse, error) //TODO change response to DTO!
-	GetInstrumentInfoByFigi(figi string, ctx context.Context) (*tapi.InstrumentResponse, error)
-	GetOrderState(req *tapi.GetOrderStateRequest, ctx context.Context) (*tapi.GetOrderStateResponse, error)
+	GetInstrumentInfoByFigi(figi string, ctx context.Context) (*dtotapi.InstrumentResponse, error)
+	GetOrderState(req *dtotapi.GetOrderStateRequest, ctx context.Context) (*dtotapi.GetOrderStateResponse, error)
 
-	GetLastPrices(figis []string, ctx context.Context) (*tapi.LastPricesResponse, error)
-	GetPositions(req *tapi.PositionsRequest, ctx context.Context) (*tapi.PositionsResponse, error)
+	GetLastPrices(figis []string, ctx context.Context) (*dtotapi.LastPricesResponse, error)
+	GetPositions(req *dtotapi.PositionsRequest, ctx context.Context) (*dtotapi.PositionsResponse, error)
 }
 
 type BaseInfoSrv struct {
@@ -97,15 +97,15 @@ func (i *BaseInfoSrv) GetAllShares(ctx context.Context) (*investapi.SharesRespon
 	return i.tapi.GetAllShares(ctx)
 }
 
-func (i *BaseInfoSrv) GetInstrumentInfoByFigi(figi string, ctx context.Context) (*tapi.InstrumentResponse, error) {
-	req := tapi.InstrumentRequest{
-		IdType: tapi.InstrumentIdTypeFigi,
+func (i *BaseInfoSrv) GetInstrumentInfoByFigi(figi string, ctx context.Context) (*dtotapi.InstrumentResponse, error) {
+	req := dtotapi.InstrumentRequest{
+		IdType: dtotapi.InstrumentIdTypeFigi,
 		Id:     figi,
 	}
 	return i.tapi.GetInstrumentInfo(&req, ctx)
 }
 
-func (i *BaseInfoSrv) GetLastPrices(figis []string, ctx context.Context) (*tapi.LastPricesResponse, error) {
-	req := tapi.LastPricesRequest{Figis: figis}
+func (i *BaseInfoSrv) GetLastPrices(figis []string, ctx context.Context) (*dtotapi.LastPricesResponse, error) {
+	req := dtotapi.LastPricesRequest{Figis: figis}
 	return i.tapi.GetLastPrices(&req, ctx)
 }

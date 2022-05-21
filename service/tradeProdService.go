@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 	"go.uber.org/zap"
-	"invest-robot/dto/tapi"
+	"invest-robot/dto/dtotapi"
 	"invest-robot/tinapi"
 )
 
@@ -12,15 +12,15 @@ type TradeProdService struct {
 	logger *zap.SugaredLogger
 }
 
-func (ts *TradeProdService) CancelOrder(req *tapi.CancelOrderRequest, ctx context.Context) (*tapi.CancelOrderResponse, error) {
+func (ts *TradeProdService) CancelOrder(req *dtotapi.CancelOrderRequest, ctx context.Context) (*dtotapi.CancelOrderResponse, error) {
 	return ts.TinApi.CancelProdOrder(req, ctx)
 }
 
-func (ts *TradeProdService) PostOrder(req *tapi.PostOrderRequest, ctx context.Context) (*tapi.PostOrderResponse, error) {
+func (ts *TradeProdService) PostOrder(req *dtotapi.PostOrderRequest, ctx context.Context) (*dtotapi.PostOrderResponse, error) {
 	return ts.TinApi.PostProdOrder(req, ctx)
 }
 
-func (ts *TradeProdService) GetOrderStatus(req *tapi.GetOrderStateRequest, ctx context.Context) (*tapi.GetOrderStateResponse, error) {
+func (ts *TradeProdService) GetOrderStatus(req *dtotapi.GetOrderStateRequest, ctx context.Context) (*dtotapi.GetOrderStateResponse, error) {
 	return ts.TinApi.GetProdOrderState(req, ctx)
 }
 
