@@ -9,6 +9,8 @@ import (
 	"invest-robot/collections"
 	"invest-robot/convert"
 	"invest-robot/domain"
+	"invest-robot/errors"
+	"invest-robot/helper"
 	"invest-robot/service"
 	investapi "invest-robot/tapigen"
 	"io"
@@ -17,19 +19,20 @@ import (
 )
 
 type DataProcProd struct {
-	stream     investapi.MarketDataStreamService_MarketDataStreamClient
-	algo       *domain.Algorithm
-	infoSrv    service.InfoSrv
-	algoId     uint
-	params     map[string]string
-	figis      []string
-	ctx        context.Context
-	dtCh       chan procData
-	origDtCh   chan *investapi.MarketDataResponse
-	trackId    string
-	restartMin int
+	stream   investapi.MarketDataStreamService_MarketDataStreamClient
+	algo     *domain.Algorithm
+	infoSrv  service.InfoSrv
+	algoId   uint                               //Algorithm id
+	params   map[string]string                  //Algorithm parameters - sizes of AVR windows
+	figis    []string                           //List of instrument figis to send to algorithm
+	ctx      context.Context                    //Data processor context to save and restore, TODO not implemented
+	dtCh     chan procData                      //Channel for algorithm with processed (calculated AVR etc) data from stream
+	origDtCh chan *investapi.MarketDataResponse //Channel populated from market stream
+	trackId  string                             //Track id in case of incorrect response
+	retryMin int                                //Minutes before consecutive retries when data stream broken
+	retryNum int                                //Number restore retries when data stream broken
 
-	longDur int
+	longDur int //Extracted to state because of using in extract history method
 	savMap  map[string]*collections.TList[decimal.Decimal]
 	lavMap  map[string]*collections.TList[decimal.Decimal]
 	logger  *zap.SugaredLogger
@@ -131,6 +134,7 @@ OUT:
 	}
 }
 
+//Background task which receives data from stream and send it to channel (for simpler support of context and processor stopping)
 func (d *DataProcProd) processDataInBg() {
 	defer func() {
 		d.logger.Info("Closing tin API data channel...")
@@ -139,32 +143,52 @@ func (d *DataProcProd) processDataInBg() {
 	for {
 		cDat, err := d.stream.Recv()
 		if err != nil {
+			//Process end of stream and no need to restore
 			if err == io.EOF {
 				d.logger.Info("Received end of stream...")
 				return
 			}
 
-			//To process errors from grpc stream (Context cancel etc)
+			//Process cancel error when context canceled and no need to restore
 			if code := status.Code(err); code == codes.Canceled {
 				d.logger.Info("Received canceled code: ", code)
 				return
 			}
 
-			d.logger.Infof("Trying to re-create channel after %d min", d.restartMin)
-			time.Sleep(3 * time.Minute)
-			d.stream, err = d.infoSrv.GetDataStream(d.ctx)
+			//Trying to restore stream with set number of iterations
+			err = d.restoreDataStreamWithRetries()
 			if err != nil {
-				d.logger.Error("Recreate stream failed with error: ", err, " Stopping processor...")
-				return
-			}
-			err = d.subscribe()
-			if err != nil {
-				d.logger.Error("Subscribe new stream failed with error: ", err, " Stopping processor...")
+				d.logger.Error(err)
 				return
 			}
 		}
 		d.origDtCh <- cDat
 	}
+}
+
+//Retries to create and subscribe to new channel to restore data receiving
+//Uses retryNum and retryMin parameters
+func (d *DataProcProd) restoreDataStreamWithRetries() error {
+	var err error
+	retryNumCp := d.retryNum //Copy to make no change of original setting
+	d.logger.Info("Starting stream restoring for alg ", d.algoId, " with ", retryNumCp, " retries and interval (min) ", d.retryMin)
+	for ; retryNumCp > 0; retryNumCp-- {
+		time.Sleep(time.Duration(d.retryMin) * time.Minute)
+		d.logger.Infof("Retry remains %d. Trying to re-create channel after %d min", retryNumCp, d.retryMin)
+		d.stream, err = d.infoSrv.GetDataStream(d.ctx)
+		if err != nil {
+			d.logger.Error("Recreate stream failed with error: ", err)
+			continue
+		}
+		err = d.subscribe()
+		if err != nil {
+			d.logger.Error("Subscribe new stream failed with error: ", err)
+		} else {
+			d.logger.Info("Stream successfully restored for algorithm ", d.algoId)
+			return nil
+		}
+	}
+	return errors.NewUnexpectedError("Not possible to restore data stream, exiting...")
 }
 
 func (d *DataProcProd) prefetchHistory() error {
@@ -252,17 +276,19 @@ func (d *DataProcProd) Stop() error {
 }
 
 func newDataProc(req *domain.Algorithm, infoSrv service.InfoSrv, logger *zap.SugaredLogger) (DataProc, error) {
+	helper.GetDbUser()
 	return &DataProcProd{
-		algo:       req,
-		infoSrv:    infoSrv,
-		algoId:     req.ID,
-		params:     domain.ParamsToMap(req.Params),
-		figis:      req.Figis,
-		dtCh:       make(chan procData),
-		origDtCh:   make(chan *investapi.MarketDataResponse),
-		savMap:     make(map[string]*collections.TList[decimal.Decimal]),
-		lavMap:     make(map[string]*collections.TList[decimal.Decimal]),
-		logger:     logger,
-		restartMin: 3,
+		algo:     req,
+		infoSrv:  infoSrv,
+		algoId:   req.ID,
+		params:   domain.ParamsToMap(req.Params),
+		figis:    req.Figis,
+		dtCh:     make(chan procData),
+		origDtCh: make(chan *investapi.MarketDataResponse),
+		savMap:   make(map[string]*collections.TList[decimal.Decimal]),
+		lavMap:   make(map[string]*collections.TList[decimal.Decimal]),
+		logger:   logger,
+		retryMin: helper.GetRetryMin(),
+		retryNum: helper.GetRetryNum(),
 	}, nil
 }

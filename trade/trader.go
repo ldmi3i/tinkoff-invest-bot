@@ -45,7 +45,6 @@ func (t *BaseTrader) AddSubscription(sub *stmodel.Subscription) error {
 //Background task to process subscriptions and redirect all of them to single stream
 func (t *BaseTrader) subBg(sub *stmodel.Subscription) {
 	t.logger.Infof("Starting background processing for algo with id: %d", sub.AlgoID)
-	//TODO Add stop channel and select, is stop needed for trader?
 	for req := range sub.AChan {
 		t.logger.Infof("Received algo request: %+v", req)
 		t.algoCh <- req

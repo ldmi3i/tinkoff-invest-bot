@@ -4,6 +4,7 @@ import (
 	"time"
 )
 
+//AlgorithmsResponse represents algorithm list response
 type AlgorithmsResponse struct {
 	Algorithms []*AlgorithmResponse `json:"algorithms"`
 }

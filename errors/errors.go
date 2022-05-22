@@ -1,27 +1,9 @@
 package errors
 
-type msgError struct {
-	m string
-}
-
-func (msg msgError) Error() string {
-	return msg.m
-}
+import "errors"
 
 func NewUnexpectedError(msg string) error {
-	return msgError{msg}
-}
-
-type doubleSubErr struct {
-	m string
-}
-
-func (msg doubleSubErr) Error() string {
-	return msg.m
-}
-
-func NewDoubleSubErr(msg string) error {
-	return doubleSubErr{msg}
+	return errors.New(msg)
 }
 
 // NewNotImplemented auxiliary - to mark not implemented

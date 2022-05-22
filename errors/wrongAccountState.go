@@ -1,13 +1,14 @@
 package errors
 
-type WrongAccState struct {
+//WrongAccStateErr happens when account in wrong state
+type WrongAccStateErr struct {
 	msg string
 }
 
-func (err WrongAccState) Error() string {
+func (err WrongAccStateErr) Error() string {
 	return err.msg
 }
 
-func NewWrongAccState(msg string) WrongAccState {
-	return WrongAccState{msg: msg}
+func NewWrongAccState(msg string) WrongAccStateErr {
+	return WrongAccStateErr{msg: msg}
 }

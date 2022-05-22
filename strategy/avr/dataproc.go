@@ -9,6 +9,7 @@ import (
 	"time"
 )
 
+//DataProc provides data with short and long AVR windows for the algorithm
 type DataProc interface {
 	GetDataStream() (<-chan procData, error)
 	Go(ctx context.Context) error
@@ -22,9 +23,10 @@ type procData struct {
 	Price decimal.Decimal //current price
 }
 
+//Average window parameters
 const (
-	ShortDur string = "short_dur"
-	LongDur  string = "long_dur"
+	ShortDur string = "short_dur" //Short window length in sec
+	LongDur  string = "long_dur"  //Long window length in sec
 )
 
 func calcAvg(lst *collections.TList[decimal.Decimal]) (*decimal.Decimal, error) {
