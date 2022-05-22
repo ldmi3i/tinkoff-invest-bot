@@ -17,7 +17,7 @@ import (
 type Api interface {
 	GetHistorySorted(figis []string, ivl investapi.CandleInterval, startDate time.Time, endDate time.Time, ctx context.Context) ([]domain.History, error)
 	MarketDataStream(ctx context.Context) (investapi.MarketDataStreamService_MarketDataStreamClient, error)
-	GetAllShares(ctx context.Context) (*investapi.SharesResponse, error)
+	GetAllShares(ctx context.Context) (*dtotapi.SharesResponse, error)
 	GetInstrumentInfo(req *dtotapi.InstrumentRequest, ctx context.Context) (*dtotapi.InstrumentResponse, error)
 	GetLastPrices(req *dtotapi.LastPricesRequest, ctx context.Context) (*dtotapi.LastPricesResponse, error)
 	GetOrderStream(accounts []string, ctx context.Context) (investapi.OrdersStreamService_TradesStreamClient, error)
@@ -105,14 +105,14 @@ func (t *DefaultTinApi) MarketDataStream(ctx context.Context) (investapi.MarketD
 	return stream, nil
 }
 
-func (t *DefaultTinApi) GetAllShares(ctx context.Context) (*investapi.SharesResponse, error) {
+func (t *DefaultTinApi) GetAllShares(ctx context.Context) (*dtotapi.SharesResponse, error) {
 	ctxA := contextWithAuth(ctx)
 	req := investapi.InstrumentsRequest{InstrumentStatus: investapi.InstrumentStatus_INSTRUMENT_STATUS_BASE}
 	shares, err := t.instrCl.Shares(ctxA, &req)
 	if err != nil {
 		return nil, err
 	}
-	return shares, nil
+	return dtotapi.SharesResponseToDto(shares), nil
 }
 
 func (t *DefaultTinApi) GetInstrumentInfo(req *dtotapi.InstrumentRequest, ctx context.Context) (*dtotapi.InstrumentResponse, error) {

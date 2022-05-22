@@ -18,7 +18,7 @@ type InfoSrv interface {
 	GetDataStream(ctx context.Context) (investapi.MarketDataStreamService_MarketDataStreamClient, error)
 
 	//GetAllShares return all shares, available for operating through API
-	GetAllShares(ctx context.Context) (*investapi.SharesResponse, error) //TODO change response to DTO!
+	GetAllShares(ctx context.Context) (*dtotapi.SharesResponse, error)
 
 	//GetInstrumentInfoByFigi returns instrument information by figi identifier
 	GetInstrumentInfoByFigi(figi string, ctx context.Context) (*dtotapi.InstrumentResponse, error)
@@ -100,7 +100,7 @@ func (i *BaseInfoSrv) GetDataStream(ctx context.Context) (investapi.MarketDataSt
 	return i.tapi.MarketDataStream(ctx)
 }
 
-func (i *BaseInfoSrv) GetAllShares(ctx context.Context) (*investapi.SharesResponse, error) {
+func (i *BaseInfoSrv) GetAllShares(ctx context.Context) (*dtotapi.SharesResponse, error) {
 	return i.tapi.GetAllShares(ctx)
 }
 

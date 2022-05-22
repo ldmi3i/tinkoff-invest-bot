@@ -27,9 +27,11 @@ services:
       DB_PORT: "5432"
       DB_PASSWORD: "54643243325"
       GIN_MODE: "release"
-      GRPC_GO_LOG_SEVERITY_LEVEL: "info"
-      GRPC_GO_LOG_VERBOSITY_LEVEL: "99"
-      TIN_TOKEN: "t.RpF5XdaXJIta0w9DPQ5Nn7uuIASL7ASH6C7MhYQuCutc3Fxoedc9DPFDwI4npN-WQKdSQZjOBBS27rhn9-oCzw"
+      RETRY_NUM: 3
+      RETRY_INTERVAL_MIN: 3
+#      GRPC_GO_LOG_SEVERITY_LEVEL: "info" #For GRPC debug
+#      GRPC_GO_LOG_VERBOSITY_LEVEL: "99"
+      TIN_TOKEN: "YOUR TOKEN"
     deploy:
       restart_policy:
         condition: on-failure

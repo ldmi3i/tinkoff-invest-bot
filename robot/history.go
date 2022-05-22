@@ -5,6 +5,7 @@ import (
 	"go.uber.org/zap"
 	"invest-robot/domain"
 	"invest-robot/dto"
+	"invest-robot/dto/dtotapi"
 	"invest-robot/repository"
 	"invest-robot/service"
 	"invest-robot/strategy"
@@ -62,7 +63,7 @@ func (h *DefaultHistoryAPI) AnalyzeAlgo(req *dto.CreateAlgorithmRequest, ctx con
 	return res, nil
 }
 
-func (h *DefaultHistoryAPI) performAnalysis(req *dto.CreateAlgorithmRequest, shares *investapi.SharesResponse,
+func (h *DefaultHistoryAPI) performAnalysis(req *dto.CreateAlgorithmRequest, shares *dtotapi.SharesResponse,
 	alg stmodel.Algorithm, ctx context.Context) (*dto.HistStatResponse, error) {
 	sub, err := alg.Subscribe()
 	if err != nil {
@@ -78,7 +79,7 @@ func (h *DefaultHistoryAPI) performAnalysis(req *dto.CreateAlgorithmRequest, sha
 		if !figiSet[instr.Figi] {
 			continue
 		}
-		lots[instr.Figi] = int64(instr.Lot)
+		lots[instr.Figi] = instr.Lot
 		figiCurrency[instr.Figi] = instr.Currency
 	}
 	trDr := trade.NewMockTrader(h.histRep, lots, figiCurrency, h.logger)
@@ -132,7 +133,7 @@ func (h *DefaultHistoryAPI) AnalyzeAlgoInRange(req *dto.CreateAlgorithmRequest, 
 }
 
 func (h *DefaultHistoryAPI) rangeAnalyzeBg(algRange []stmodel.Algorithm, req *dto.CreateAlgorithmRequest,
-	shares *investapi.SharesResponse, ctx context.Context) chan *dto.HistStatIdDto {
+	shares *dtotapi.SharesResponse, ctx context.Context) chan *dto.HistStatIdDto {
 	var wg sync.WaitGroup
 	resCh := make(chan *dto.HistStatIdDto)
 	concurrency := 18
