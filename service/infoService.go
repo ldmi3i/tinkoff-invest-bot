@@ -13,12 +13,19 @@ import (
 type InfoSrv interface {
 	//GetHistorySorted return sorted by time history in time interval
 	GetHistorySorted(finis []string, ivl investapi.CandleInterval, startTime time.Time, endTime time.Time, ctx context.Context) ([]domain.History, error)
+
 	//GetDataStream returns bidirectional data stream client
 	GetDataStream(ctx context.Context) (investapi.MarketDataStreamService_MarketDataStreamClient, error)
+
 	//GetAllShares return all shares, available for operating through API
 	GetAllShares(ctx context.Context) (*investapi.SharesResponse, error) //TODO change response to DTO!
+
+	//GetInstrumentInfoByFigi returns instrument information by figi identifier
 	GetInstrumentInfoByFigi(figi string, ctx context.Context) (*dtotapi.InstrumentResponse, error)
 	GetOrderState(req *dtotapi.GetOrderStateRequest, ctx context.Context) (*dtotapi.GetOrderStateResponse, error)
+
+	//GetAccounts returns accounts by token
+	GetAccounts(ctx context.Context) (*dtotapi.AccountsResponse, error)
 
 	GetLastPrices(figis []string, ctx context.Context) (*dtotapi.LastPricesResponse, error)
 	GetPositions(req *dtotapi.PositionsRequest, ctx context.Context) (*dtotapi.PositionsResponse, error)

@@ -23,3 +23,7 @@ func (is *InfoProdService) GetPositions(req *dtotapi.PositionsRequest, ctx conte
 func (is *InfoProdService) GetOrderState(req *dtotapi.GetOrderStateRequest, ctx context.Context) (*dtotapi.GetOrderStateResponse, error) {
 	return is.tapi.GetProdOrderState(req, ctx)
 }
+
+func (is *InfoProdService) GetAccounts(ctx context.Context) (*dtotapi.AccountsResponse, error) {
+	return is.tapi.GetProdAccounts(ctx)
+}

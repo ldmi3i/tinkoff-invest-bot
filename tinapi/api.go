@@ -33,6 +33,9 @@ type Api interface {
 
 	GetSandboxPositions(req *dtotapi.PositionsRequest, ctx context.Context) (*dtotapi.PositionsResponse, error)
 	GetProdPositions(req *dtotapi.PositionsRequest, ctx context.Context) (*dtotapi.PositionsResponse, error)
+
+	GetSandboxAccounts(ctx context.Context) (*dtotapi.AccountsResponse, error)
+	GetProdAccounts(ctx context.Context) (*dtotapi.AccountsResponse, error)
 }
 
 type DefaultTinApi struct {
@@ -43,6 +46,7 @@ type DefaultTinApi struct {
 	orderCl       investapi.OrdersServiceClient
 	operationsCl  investapi.OperationsServiceClient
 	orderStCl     investapi.OrdersStreamServiceClient
+	usersCl       investapi.UsersServiceClient
 	logger        *zap.SugaredLogger
 }
 
@@ -55,6 +59,7 @@ func NewTinApi(logger *zap.SugaredLogger) Api {
 		investapi.NewOrdersServiceClient(helper.GetClient()),
 		investapi.NewOperationsServiceClient(helper.GetClient()),
 		investapi.NewOrdersStreamServiceClient(helper.GetClient()),
+		investapi.NewUsersServiceClient(helper.GetClient()),
 		logger,
 	}
 }
@@ -206,4 +211,22 @@ func (t *DefaultTinApi) GetOrderStream(accounts []string, ctx context.Context) (
 	ctxA := contextWithAuth(ctx)
 	req := investapi.TradesStreamRequest{Accounts: accounts}
 	return t.orderStCl.TradesStream(ctxA, &req)
+}
+
+func (t *DefaultTinApi) GetSandboxAccounts(ctx context.Context) (*dtotapi.AccountsResponse, error) {
+	ctxA := contextWithAuth(ctx)
+	accounts, err := t.sandboxCl.GetSandboxAccounts(ctxA, &investapi.GetAccountsRequest{})
+	if err != nil {
+		return nil, err
+	}
+	return dtotapi.AccountsResponseToDto(accounts), nil
+}
+
+func (t *DefaultTinApi) GetProdAccounts(ctx context.Context) (*dtotapi.AccountsResponse, error) {
+	ctxA := contextWithAuth(ctx)
+	accounts, err := t.usersCl.GetAccounts(ctxA, &investapi.GetAccountsRequest{})
+	if err != nil {
+		return nil, err
+	}
+	return dtotapi.AccountsResponseToDto(accounts), nil
 }

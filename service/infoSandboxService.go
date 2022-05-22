@@ -23,3 +23,7 @@ func (is *InfoSandboxService) GetPositions(req *dtotapi.PositionsRequest, ctx co
 func (is *InfoSandboxService) GetOrderState(req *dtotapi.GetOrderStateRequest, ctx context.Context) (*dtotapi.GetOrderStateResponse, error) {
 	return is.tapi.GetSandboxOrderState(req, ctx)
 }
+
+func (is *InfoSandboxService) GetAccounts(ctx context.Context) (*dtotapi.AccountsResponse, error) {
+	return is.tapi.GetSandboxAccounts(ctx)
+}
