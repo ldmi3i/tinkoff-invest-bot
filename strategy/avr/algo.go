@@ -100,7 +100,6 @@ func (a *AlgorithmImpl) Go(parCtx context.Context) error {
 func (a *AlgorithmImpl) procBg(datCh <-chan procData) {
 	defer func() {
 		a.isActive.UnSet()
-		close(a.arChan)
 		close(a.aChan)
 		a.logger.Infof("Stopping algorithm background; ID: %d", a.id)
 	}()
@@ -126,7 +125,6 @@ func (a *AlgorithmImpl) procBg(datCh <-chan procData) {
 				return
 			}
 		case pDat, ok := <-datCh:
-			a.logger.Debugf("Receiving data, channel state: %t", ok)
 			if ok {
 				a.processData(&aDat, &pDat)
 			} else {
