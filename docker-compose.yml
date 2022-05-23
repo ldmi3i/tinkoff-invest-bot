@@ -1,0 +1,46 @@
+version: '3.9'
+
+volumes:
+  pg-data:
+    driver: local
+
+services:
+  postgres-db:
+    image: postgres
+    environment:
+      POSTGRES_PASSWORD: "54643243325"
+      POSTGRES_USER: "user"
+      POSTGRES_DB: "invest-bot"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+
+  invest-bot:
+    container_name: invest-bot
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DB_USER: "user"
+      DB_HOST: "postgres-db"
+      DB_PORT: "5432"
+      DB_PASSWORD: "54643243325"
+      GIN_MODE: "release"
+      RETRY_NUM: 3
+      RETRY_INTERVAL_MIN: 3
+#      GRPC_GO_LOG_SEVERITY_LEVEL: "info" #For GRPC debug
+#      GRPC_GO_LOG_VERBOSITY_LEVEL: "99"
+      TIN_TOKEN: "YOUR TOKEN"
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 60s
+    depends_on:
+      - postgres-db
+    links:
+      - postgres-db
+    ports:
+      - "8017:8017"
