@@ -22,12 +22,16 @@ type InfoSrv interface {
 
 	//GetInstrumentInfoByFigi returns instrument information by figi identifier
 	GetInstrumentInfoByFigi(figi string, ctx context.Context) (*dtotapi.InstrumentResponse, error)
-	GetOrderState(req *dtotapi.GetOrderStateRequest, ctx context.Context) (*dtotapi.GetOrderStateResponse, error)
+	//GetOrderState returns current order state and other info
+	GetOrderState(req *dtotapi.OrderStateRequest, ctx context.Context) (*dtotapi.OrderStateResponse, error)
 
-	//GetAccounts returns accounts by token
+	//GetAccounts returns accounts for the token
 	GetAccounts(ctx context.Context) (*dtotapi.AccountsResponse, error)
 
+	//GetLastPrices returns last price for the instrument
 	GetLastPrices(figis []string, ctx context.Context) (*dtotapi.LastPricesResponse, error)
+
+	//GetPositions returns current amount of money and instrument from the requested account
 	GetPositions(req *dtotapi.PositionsRequest, ctx context.Context) (*dtotapi.PositionsResponse, error)
 }
 
@@ -46,12 +50,12 @@ func (i *BaseInfoSrv) GetHistorySorted(figis []string, ivl investapi.CandleInter
 	}
 	var hist []domain.History
 	if next.After(endTime) {
-		hist, err = i.tapi.GetHistorySorted(figis, ivl, startTime, endTime, ctx)
+		hist, err = i.tapi.GetHistory(figis, ivl, startTime, endTime, ctx)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		if hist, err = i.tapi.GetHistorySorted(figis, ivl, startTime, *next, ctx); err != nil {
+		if hist, err = i.tapi.GetHistory(figis, ivl, startTime, *next, ctx); err != nil {
 			return nil, err
 		}
 		curr := next
@@ -59,7 +63,7 @@ func (i *BaseInfoSrv) GetHistorySorted(figis []string, ivl investapi.CandleInter
 			return nil, err
 		}
 		for next.Before(endTime) {
-			row, err := i.tapi.GetHistorySorted(figis, ivl, *curr, *next, ctx)
+			row, err := i.tapi.GetHistory(figis, ivl, *curr, *next, ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -69,7 +73,7 @@ func (i *BaseInfoSrv) GetHistorySorted(figis []string, ivl investapi.CandleInter
 				return nil, err
 			}
 		}
-		row, err := i.tapi.GetHistorySorted(figis, ivl, *curr, endTime, ctx)
+		row, err := i.tapi.GetHistory(figis, ivl, *curr, endTime, ctx)
 		if err != nil {
 			return nil, err
 		}

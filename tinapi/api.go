@@ -15,7 +15,7 @@ import (
 
 //Api is a wrapper under generated GRPC to provide only required methods
 type Api interface {
-	GetHistorySorted(figis []string, ivl investapi.CandleInterval, startDate time.Time, endDate time.Time, ctx context.Context) ([]domain.History, error)
+	GetHistory(figis []string, ivl investapi.CandleInterval, startDate time.Time, endDate time.Time, ctx context.Context) ([]domain.History, error)
 	MarketDataStream(ctx context.Context) (investapi.MarketDataStreamService_MarketDataStreamClient, error)
 	GetAllShares(ctx context.Context) (*dtotapi.SharesResponse, error)
 	GetInstrumentInfo(req *dtotapi.InstrumentRequest, ctx context.Context) (*dtotapi.InstrumentResponse, error)
@@ -28,8 +28,8 @@ type Api interface {
 	CancelSandboxOrder(req *dtotapi.CancelOrderRequest, ctx context.Context) (*dtotapi.CancelOrderResponse, error)
 	CancelProdOrder(req *dtotapi.CancelOrderRequest, ctx context.Context) (*dtotapi.CancelOrderResponse, error)
 
-	GetSandboxOrderState(req *dtotapi.GetOrderStateRequest, ctx context.Context) (*dtotapi.GetOrderStateResponse, error)
-	GetProdOrderState(req *dtotapi.GetOrderStateRequest, ctx context.Context) (*dtotapi.GetOrderStateResponse, error)
+	GetSandboxOrderState(req *dtotapi.OrderStateRequest, ctx context.Context) (*dtotapi.OrderStateResponse, error)
+	GetProdOrderState(req *dtotapi.OrderStateRequest, ctx context.Context) (*dtotapi.OrderStateResponse, error)
 
 	GetSandboxPositions(req *dtotapi.PositionsRequest, ctx context.Context) (*dtotapi.PositionsResponse, error)
 	GetProdPositions(req *dtotapi.PositionsRequest, ctx context.Context) (*dtotapi.PositionsResponse, error)
@@ -64,7 +64,7 @@ func NewTinApi(logger *zap.SugaredLogger) Api {
 	}
 }
 
-func (t *DefaultTinApi) GetHistorySorted(figis []string, ivl investapi.CandleInterval, startDate time.Time, endDate time.Time, ctx context.Context) ([]domain.History, error) {
+func (t *DefaultTinApi) GetHistory(figis []string, ivl investapi.CandleInterval, startDate time.Time, endDate time.Time, ctx context.Context) ([]domain.History, error) {
 	var resps = make([]domain.History, 0, len(figis))
 	ctxA := contextWithAuth(ctx)
 	for _, figi := range figis {
@@ -143,7 +143,7 @@ func (t *DefaultTinApi) PostSandboxOrder(req *dtotapi.PostOrderRequest, ctx cont
 	return dtotapi.PostOrderResponseToDto(order), nil
 }
 
-func (t *DefaultTinApi) GetSandboxOrderState(req *dtotapi.GetOrderStateRequest, ctx context.Context) (*dtotapi.GetOrderStateResponse, error) {
+func (t *DefaultTinApi) GetSandboxOrderState(req *dtotapi.OrderStateRequest, ctx context.Context) (*dtotapi.OrderStateResponse, error) {
 	ctxA := contextWithAuth(ctx)
 	resp, err := t.sandboxCl.GetSandboxOrderState(ctxA, req.ToTinApi())
 	if err != nil {
@@ -152,7 +152,7 @@ func (t *DefaultTinApi) GetSandboxOrderState(req *dtotapi.GetOrderStateRequest, 
 	return dtotapi.OrderStateResponseToDto(resp), nil
 }
 
-func (t *DefaultTinApi) GetProdOrderState(req *dtotapi.GetOrderStateRequest, ctx context.Context) (*dtotapi.GetOrderStateResponse, error) {
+func (t *DefaultTinApi) GetProdOrderState(req *dtotapi.OrderStateRequest, ctx context.Context) (*dtotapi.OrderStateResponse, error) {
 	ctxA := contextWithAuth(ctx)
 	resp, err := t.orderCl.GetOrderState(ctxA, req.ToTinApi())
 	if err != nil {

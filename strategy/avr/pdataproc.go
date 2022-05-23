@@ -191,6 +191,7 @@ func (d *DataProcProd) restoreDataStreamWithRetries() error {
 	return errors.NewUnexpectedError("Not possible to restore data stream, exiting...")
 }
 
+//prefetchHistory populates average windows with data from history to start working effective immediate
 func (d *DataProcProd) prefetchHistory() error {
 	endTime := time.Now()
 	dur := time.Duration(-d.longDur) * time.Second

@@ -6,6 +6,7 @@ import (
 	"invest-robot/errors"
 )
 
+//AlgoRepository provides methods to operate domain.Algorithm database data
 type AlgoRepository interface {
 	Save(algo *domain.Algorithm) error
 	SetActiveStatus(id uint, isActive bool) error

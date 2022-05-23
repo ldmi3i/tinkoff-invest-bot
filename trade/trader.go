@@ -59,7 +59,7 @@ func (t *BaseTrader) checkOrdersBg() {
 		t.logger.Debug("Check orders, len ", len(sl))
 		for _, entry := range sl {
 			action := entry.Value
-			req := dtotapi.GetOrderStateRequest{
+			req := dtotapi.OrderStateRequest{
 				AccountId: action.AccountID,
 				OrderId:   entry.Key,
 			}
