@@ -17,9 +17,13 @@ import (
 	"time"
 )
 
+//HistoryAPI is an interface for interacting with history data
 type HistoryAPI interface {
+	//LoadHistory loads history from API and replace existing data in database with newly retrieved
 	LoadHistory(figis []string, ivl investapi.CandleInterval, startTime time.Time, endTime time.Time, ctx context.Context) error
+	//AnalyzeAlgo Analyze algorithm with fixed parameters
 	AnalyzeAlgo(req *dto.CreateAlgorithmRequest, ctx context.Context) (*dto.HistStatResponse, error)
+	//AnalyzeAlgoInRange Analyze algorithm with parameter variation
 	AnalyzeAlgoInRange(req *dto.CreateAlgorithmRequest, ctx context.Context) (*dto.HistStatInRangeResponse, error)
 }
 

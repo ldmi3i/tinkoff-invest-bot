@@ -18,6 +18,7 @@ func GetContext() *Context {
 	return &ctx
 }
 
+//Initializes application context and populate it with objects
 func init() {
 	logConf := zap.NewDevelopmentConfig()
 	if helper.GetLogFilePath() != "" {
@@ -66,19 +67,21 @@ func init() {
 	}
 }
 
+//Context keeps objects of all API classes.
+//Using of Context is preferred way of retrieving instances of all objects.
 type Context struct {
-	infoSdxSrv   service.InfoSrv
-	infoProdSrv  service.InfoSrv
-	tradeSdxSrv  service.TradeService
-	tradeProdSrv service.TradeService
+	infoSdxSrv   service.InfoSrv      //Sandbox information service
+	infoProdSrv  service.InfoSrv      //Prod information service
+	tradeSdxSrv  service.TradeService //Sandbox trade service
+	tradeProdSrv service.TradeService //Prod trade service
 	statSrv      service.StatService
 	hRep         repository.HistoryRepository
 	aRep         repository.AlgoRepository
 	actionRep    repository.ActionRepository
 	statRep      repository.StatRepository
 	aFact        strategy.AlgFactory
-	sdxTrader    trade.Trader
-	prodTrader   trade.Trader
+	sdxTrader    trade.Trader //Sandbox trader
+	prodTrader   trade.Trader //Prod trader
 	logger       *zap.SugaredLogger
 	ctx          context.Context
 }
@@ -119,10 +122,11 @@ func (ctx *Context) GetStatService() service.StatService {
 	return ctx.statSrv
 }
 
+//StartBgTasks start required background tasks.
 func StartBgTasks() {
 	ctx.logger.Info("Starting background tasks...")
-	ctx.sdxTrader.Go(ctx.ctx)
-	ctx.prodTrader.Go(ctx.ctx)
+	ctx.sdxTrader.Go(ctx.ctx)  //Starting sandbox trader
+	ctx.prodTrader.Go(ctx.ctx) //Starting prod trader
 }
 
 func PostProcess() {

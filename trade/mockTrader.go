@@ -113,6 +113,7 @@ OUT:
 	stat.SellOpNum = trDat.SellOper
 	stat.BuyOpNum = trDat.BuyOper
 	t.statCh <- stat
+	close(t.sub.RChan)
 }
 
 func (t *MockTrader) procBuy(opInfo trmodel.OpInfo, action *domain.Action, trDat *mockTraderData) {
