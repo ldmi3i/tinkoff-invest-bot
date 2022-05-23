@@ -7,6 +7,7 @@ import (
 )
 
 type StatAPI interface {
+	//GetAlgorithmStat collects and returns statistics on the algorithm with requested id
 	GetAlgorithmStat(req *dto.StatAlgoRequest) (*dto.StatAlgoResponse, error)
 }
 

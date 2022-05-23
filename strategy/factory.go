@@ -12,8 +12,13 @@ import (
 	"invest-robot/strategy/stmodel"
 )
 
+//algProdFunc represents common production algorithm factory method
 type algProdFunc func(req *domain.Algorithm, infoSrv service.InfoSrv, logger *zap.SugaredLogger) (stmodel.Algorithm, error)
+
+//algSandboxFunc represents common sandbox algorithm factory method
 type algSandboxFunc func(req *domain.Algorithm, infoSrv service.InfoSrv, logger *zap.SugaredLogger) (stmodel.Algorithm, error)
+
+//algHistFunc represents common historical algorithm factory method
 type algHistFunc func(req *domain.Algorithm, rep repository.HistoryRepository, logger *zap.SugaredLogger) (stmodel.Algorithm, error)
 
 //Mapping for algorithm creation strategy
@@ -37,13 +42,22 @@ type factoryStruct struct {
 	algSandbox algSandboxFunc
 }
 
+//AlgFactory provides methods to create new algorithms for different environments
+//Also factory caches created algorithms and provide methods with active one
 type AlgFactory interface {
+	//NewProd returns new production algorithm based on provided properties
 	NewProd(alg *domain.Algorithm) (stmodel.Algorithm, error)
+	//NewSandbox returns new sandbox algorithm based on provided properties
 	NewSandbox(alg *domain.Algorithm) (stmodel.Algorithm, error)
+	//NewHist returns algorithm for simulation on historical data
 	NewHist(alg *domain.Algorithm) (stmodel.Algorithm, error)
+	//NewRange returns slice of algorithms from provided range for simulation on historical data
 	NewRange(alg *domain.Algorithm) ([]stmodel.Algorithm, error)
+	//GetProdAlgs returns active algorithms running production environment
 	GetProdAlgs() ([]stmodel.Algorithm, error)
+	//GetSdbxAlgs returns active algorithms running sandbox environment
 	GetSdbxAlgs() ([]stmodel.Algorithm, error)
+	//GetAlgorithmById returns active algorithm by id, searches sandbox and prod environment
 	GetAlgorithmById(algoId uint) (stmodel.Algorithm, bool)
 }
 

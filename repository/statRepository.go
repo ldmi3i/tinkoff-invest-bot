@@ -5,6 +5,7 @@ import (
 	"invest-robot/dto"
 )
 
+//StatRepository provides methods to retrieve statistics data from database
 type StatRepository interface {
 	GetAlgorithmStat(req *dto.StatAlgoRequest) (*dto.StatAlgoResponse, error)
 }

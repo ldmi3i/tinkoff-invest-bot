@@ -20,7 +20,7 @@ func (ts *TradeProdService) PostOrder(req *dtotapi.PostOrderRequest, ctx context
 	return ts.TinApi.PostProdOrder(req, ctx)
 }
 
-func (ts *TradeProdService) GetOrderStatus(req *dtotapi.GetOrderStateRequest, ctx context.Context) (*dtotapi.GetOrderStateResponse, error) {
+func (ts *TradeProdService) GetOrderStatus(req *dtotapi.OrderStateRequest, ctx context.Context) (*dtotapi.OrderStateResponse, error) {
 	return ts.TinApi.GetProdOrderState(req, ctx)
 }
 

@@ -7,6 +7,7 @@ import (
 	"invest-robot/domain"
 )
 
+//HistoryRepository provides methods to operate domain.History database data
 type HistoryRepository interface {
 	ClearAndSaveAll(history []domain.History) error
 	FindAll() ([]domain.History, error)

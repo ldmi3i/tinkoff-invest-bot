@@ -20,7 +20,7 @@ func (is *InfoProdService) GetPositions(req *dtotapi.PositionsRequest, ctx conte
 	return is.tapi.GetProdPositions(req, ctx)
 }
 
-func (is *InfoProdService) GetOrderState(req *dtotapi.GetOrderStateRequest, ctx context.Context) (*dtotapi.GetOrderStateResponse, error) {
+func (is *InfoProdService) GetOrderState(req *dtotapi.OrderStateRequest, ctx context.Context) (*dtotapi.OrderStateResponse, error) {
 	return is.tapi.GetProdOrderState(req, ctx)
 }
 
