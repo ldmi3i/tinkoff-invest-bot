@@ -15,7 +15,6 @@ type DbDataProc struct {
 	params map[string]string
 	figis  []string
 	rep    repository.HistoryRepository
-	stopCh chan bool
 	hist   []domain.History
 	dtCh   chan procData
 	logger *zap.SugaredLogger
@@ -99,7 +98,6 @@ func newHistoryDataProc(req *domain.Algorithm, rep repository.HistoryRepository,
 		params: domain.ParamsToMap(req.Params),
 		figis:  req.Figis,
 		rep:    rep,
-		stopCh: make(chan bool, 1),
 		dtCh:   make(chan procData),
 		logger: logger,
 	}, nil

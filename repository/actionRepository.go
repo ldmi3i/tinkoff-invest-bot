@@ -7,6 +7,7 @@ import (
 	"log"
 )
 
+//ActionRepository provides methods to operate actions database data
 type ActionRepository interface {
 	Save(action *domain.Action) error
 	UpdateStatusWithMsg(id uint, status domain.ActionStatus, msg string) error

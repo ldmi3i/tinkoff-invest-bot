@@ -15,8 +15,11 @@ import (
 )
 
 type TradeAPI interface {
+	//Trade starts trading with provided parameters
 	Trade(req *dto.CreateAlgorithmRequest, ctx context.Context) (*dto.TradeStartResponse, error)
+	//GetActiveAlgorithms returns list of active algorithms
 	GetActiveAlgorithms() (*dto.AlgorithmsResponse, error)
+	//StopAlgorithm stops algorithm with requested id
 	StopAlgorithm(req *dto.StopAlgorithmRequest) (*dto.StopAlgorithmResponse, error)
 }
 

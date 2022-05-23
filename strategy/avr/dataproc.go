@@ -11,7 +11,9 @@ import (
 
 //DataProc provides data with short and long AVR windows for the algorithm
 type DataProc interface {
+	//GetDataStream provide channel with data stream from processor
 	GetDataStream() (<-chan procData, error)
+	//Go commands DataProc to start processing data in background
 	Go(ctx context.Context) error
 }
 

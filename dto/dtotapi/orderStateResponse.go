@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-type GetOrderStateResponse struct {
+type OrderStateResponse struct {
 	OrderId           string //Идентификатор заявки.
 	Figi              string
 	LotsReq           int64                //Lots requested
@@ -40,12 +40,12 @@ func OrderStageToDto(os *investapi.OrderStage) *OrderStage {
 	}
 }
 
-func OrderStateResponseToDto(osr *investapi.OrderState) *GetOrderStateResponse {
+func OrderStateResponseToDto(osr *investapi.OrderState) *OrderStateResponse {
 	stages := make([]*OrderStage, 0, len(osr.Stages))
 	for _, stage := range osr.Stages {
 		stages = append(stages, OrderStageToDto(stage))
 	}
-	return &GetOrderStateResponse{
+	return &OrderStateResponse{
 		OrderId:           osr.OrderId,
 		Figi:              osr.Figi,
 		LotsReq:           osr.LotsRequested,

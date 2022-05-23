@@ -20,7 +20,7 @@ func (ts *TradeSandboxService) PostOrder(req *dtotapi.PostOrderRequest, ctx cont
 	return ts.TinApi.PostSandboxOrder(req, ctx)
 }
 
-func (ts *TradeSandboxService) GetOrderStatus(req *dtotapi.GetOrderStateRequest, ctx context.Context) (*dtotapi.GetOrderStateResponse, error) {
+func (ts *TradeSandboxService) GetOrderStatus(req *dtotapi.OrderStateRequest, ctx context.Context) (*dtotapi.OrderStateResponse, error) {
 	return ts.TinApi.GetSandboxOrderState(req, ctx)
 }
 
