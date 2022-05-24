@@ -142,9 +142,9 @@ func (a *AlgorithmImpl) procBg(datCh <-chan procData) {
 func (a *AlgorithmImpl) processTraderResp(aDat *AlgoData, resp *stmodel.ActionResp) error {
 	action := resp.Action
 	a.logger.Debug("Processing trader response: ", *resp.Action)
-	if resp.Action.Status == domain.SUCCESS {
+	if resp.Action.Status == domain.Success {
 		iAmount := action.LotAmount
-		if action.Direction == domain.SELL {
+		if action.Direction == domain.Sell {
 			iAmount = -iAmount
 			//Drops buy price - because the deal has already been completed
 			delete(a.buyPrice, action.InstrFigi)
@@ -185,16 +185,16 @@ func (a *AlgorithmImpl) processData(aDat *AlgoData, pDat *procData) {
 		}
 		action := domain.Action{
 			AlgorithmID:    a.id,
-			Direction:      domain.BUY,
+			Direction:      domain.Buy,
 			InstrFigi:      pDat.Figi,
 			ReqPrice:       pDat.Price,
 			ExpirationTime: time.Now().Add(a.ordExp),
-			Status:         domain.CREATED,
-			OrderType:      domain.LIMITED,
+			Status:         domain.Created,
+			OrderType:      domain.Limited,
 			RetrievedAt:    pDat.Time,
 			AccountID:      a.accountId,
 		}
-		a.logger.Infof("Conditions for BUY, requesting action: %+v", action)
+		a.logger.Infof("Conditions for Buy, requesting action: %+v", action)
 		a.aChan <- a.makeReq(&action)
 		aDat.status = waitRes
 	} else if exists && prevDiff.IsPositive() && currDiff.IsNegative() {
@@ -213,17 +213,17 @@ func (a *AlgorithmImpl) processData(aDat *AlgoData, pDat *procData) {
 		if iExists && amount != 0 {
 			action := domain.Action{
 				AlgorithmID:    a.id,
-				Direction:      domain.SELL,
+				Direction:      domain.Sell,
 				InstrFigi:      pDat.Figi,
 				LotAmount:      amount,
 				ReqPrice:       pDat.Price,
 				ExpirationTime: time.Now().Add(a.ordExp),
-				Status:         domain.CREATED,
-				OrderType:      domain.LIMITED,
+				Status:         domain.Created,
+				OrderType:      domain.Limited,
 				RetrievedAt:    pDat.Time,
 				AccountID:      a.accountId,
 			}
-			a.logger.Infof("Conditions for SELL, requesting action: %+v", action)
+			a.logger.Infof("Conditions for Sell, requesting action: %+v", action)
 			a.aChan <- a.makeReq(&action)
 			aDat.status = waitRes
 		}
