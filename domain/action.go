@@ -10,21 +10,21 @@ type ActionDirection int
 type OrderType string
 
 const (
-	CREATED  ActionStatus = "CREATED"
-	POSTED   ActionStatus = "POSTED"
-	CANCELED ActionStatus = "CANCELED"
-	SUCCESS  ActionStatus = "SUCCESS"
-	FAILED   ActionStatus = "FAILED"
+	Created  ActionStatus = "CREATED"
+	Posted   ActionStatus = "POSTED"
+	Canceled ActionStatus = "CANCELED"
+	Success  ActionStatus = "SUCCESS"
+	Failed   ActionStatus = "FAILED"
 )
 
 const (
-	BUY ActionDirection = iota
-	SELL
+	Buy ActionDirection = iota
+	Sell
 )
 
 const (
-	LIMITED OrderType = "LIMITED"
-	MARKET  OrderType = "MARKET"
+	Limited OrderType = "LIMITED"
+	Market  OrderType = "MARKET"
 )
 
 //Action represents data used in all trade order steps. Algorithm initiate action request to trader.
@@ -38,7 +38,7 @@ type Action struct {
 	InstrFigi      string          //Filled by algorithm (required); instrument figi to buy/sell
 	LotAmount      int64           //Filled by algorithm (optional); amount of instrument to sell in case of sell
 	OrderType      OrderType       //Filled by algorithm (required); type of order - is it limited request or market
-	Status         ActionStatus    //Filled by algorithm as CREATED, then trader update it status; Represents current order trade status
+	Status         ActionStatus    //Filled by algorithm as Created, then trader update it status; Represents current order trade status
 	Info           string          //Filled by trader; failed details etc.
 	Currency       string          //Filled by algorithm (required); real currency used for buy/sell
 	TotalPrice     decimal.Decimal `gorm:"type:numeric"` //Filled by trader; real full amount with taxes

@@ -80,7 +80,7 @@ OUT:
 			actCurrency, exst := t.figiCurrency[action.InstrFigi]
 			if !exst {
 				t.logger.Warnf("Requested unexpected figi: %s", action.InstrFigi)
-				t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
+				t.sub.RChan <- t.getRespWithStatus(action, domain.Failed)
 				continue
 			}
 			opInfo := trmodel.OpInfo{Currency: actCurrency}
@@ -91,16 +91,16 @@ OUT:
 			opInfo.PosPrice, err = t.calcPrice(action.InstrFigi, action.RetrievedAt)
 			if err != nil {
 				t.logger.Errorf("Error while calculating figi price: %s", err)
-				t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
+				t.sub.RChan <- t.getRespWithStatus(action, domain.Failed)
 				continue
 			}
 			if opInfo.Lim.IsZero() || opInfo.PosInLot == 0 || opInfo.PosPrice.IsZero() {
 				t.logger.Warnf("Limit or lot price is zero; figi: %s; limit: %s; pos in lot: %d;lot price: %s",
 					action.InstrFigi, opInfo.Lim, opInfo.PosInLot, opInfo.PosPrice)
-				t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
+				t.sub.RChan <- t.getRespWithStatus(action, domain.Failed)
 				continue
 			}
-			if action.Direction == domain.BUY {
+			if action.Direction == domain.Buy {
 				t.procBuy(opInfo, action, &trDat)
 			} else {
 				t.procSell(opInfo, action, &trDat)
@@ -121,7 +121,7 @@ func (t *MockTrader) procBuy(opInfo trmodel.OpInfo, action *domain.Action, trDat
 	if lotPrice.GreaterThan(opInfo.Lim) {
 		t.logger.Infof("Not enough money for figi %s; limit: %s; lot price: %s; one price: %s",
 			action.InstrFigi, opInfo.Lim, opInfo.PosPrice, lotPrice)
-		t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
+		t.sub.RChan <- t.getRespWithStatus(action, domain.Failed)
 		return
 	}
 	lotNum := opInfo.Lim.Div(lotPrice).Floor()
@@ -134,19 +134,19 @@ func (t *MockTrader) procBuy(opInfo trmodel.OpInfo, action *domain.Action, trDat
 	action.PositionPrice = opInfo.PosPrice
 	action.LotsExecuted = instrAmount
 	trDat.BuyOper += 1
-	t.sub.RChan <- t.getRespWithStatus(action, domain.SUCCESS)
+	t.sub.RChan <- t.getRespWithStatus(action, domain.Success)
 }
 
 func (t *MockTrader) procSell(opInfo trmodel.OpInfo, action *domain.Action, trDat *mockTraderData) {
 	if action.LotAmount == 0 {
 		t.logger.Info("LotAmount is 0 - nothing to sell")
-		t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
+		t.sub.RChan <- t.getRespWithStatus(action, domain.Failed)
 		return
 	}
 	price, err := t.calcPrice(action.InstrFigi, action.RetrievedAt)
 	if err != nil {
 		t.logger.Error("Can't resolve price by figi, canceling operation...")
-		t.sub.RChan <- t.getRespWithStatus(action, domain.FAILED)
+		t.sub.RChan <- t.getRespWithStatus(action, domain.Failed)
 		return
 	}
 	moneyAmount := price.Mul(decimal.NewFromInt(action.LotAmount * opInfo.PosInLot)) //Money amount is a price multiplied by num of positions
@@ -154,7 +154,7 @@ func (t *MockTrader) procSell(opInfo trmodel.OpInfo, action *domain.Action, trDa
 	trDat.ResInstr[action.InstrFigi] = trDat.ResInstr[action.InstrFigi] - action.LotAmount
 	action.TotalPrice = moneyAmount
 	trDat.SellOper += 1
-	t.sub.RChan <- t.getRespWithStatus(action, domain.SUCCESS)
+	t.sub.RChan <- t.getRespWithStatus(action, domain.Success)
 }
 
 func (t MockTrader) getRespWithStatus(action *domain.Action, status domain.ActionStatus) *stmodel.ActionResp {
