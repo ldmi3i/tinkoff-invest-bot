@@ -9,6 +9,7 @@ import (
 	"invest-robot/collections"
 	"invest-robot/domain"
 	"invest-robot/dto/dtotapi"
+	"invest-robot/errors"
 	"invest-robot/repository"
 	"invest-robot/service"
 	"invest-robot/strategy/stmodel"
@@ -52,6 +53,8 @@ func (t *BaseTrader) subBg(sub *stmodel.Subscription) {
 	t.logger.Infof("Stopping subscription for algo with id: %d", sub.AlgoID)
 }
 
+//checkOrdersBg provide periodical checks of active orders and notify algorithms about results
+//Also checks order estimation and cancel out of date orders
 func (t *BaseTrader) checkOrdersBg() {
 	t.logger.Info("Starting background checking orders...")
 	for {
@@ -79,7 +82,7 @@ func (t *BaseTrader) checkOrdersBg() {
 			case dtotapi.ExecutionReportStatusFill:
 				action.Status = domain.SUCCESS
 				action.Info = "Order successfully completed"
-				action.TotalPrice = state.TotalPrice.Value
+				action.TotalPrice = state.TotalPrice.Value //Update total price to take into account commissions (from proto OrderState.total_order_amount)
 				action.Currency = state.TotalPrice.Currency
 				action.PositionPrice = state.AvrPrice.Value
 				action.LotsExecuted = state.LotsExec
@@ -143,7 +146,7 @@ func (t *BaseTrader) checkOrdersBg() {
 func (t *BaseTrader) actionProcBg() {
 	defer func() {
 		if pnc := recover(); pnc != nil {
-			t.logger.Error("Action bg task recovered ", pnc)
+			t.logger.Error("Action bg task recovered ", errors.ConvertToError(pnc))
 		}
 	}()
 	t.logger.Info("Background action listening started...")
@@ -168,7 +171,7 @@ func (t *BaseTrader) actionProcBg() {
 	t.logger.Info("Background action listening finished...")
 }
 
-//Validate parameters and populate info context for ordering
+//Validate parameters and populate order request context for ordering (trmodel.OpInfo)
 //Returns information and flag: true if validation succeed, false if validation failed and no order may be placed
 func (t *BaseTrader) preprocessAction(req *stmodel.ActionReq, subscription *stmodel.Subscription) (*trmodel.OpInfo, bool) {
 	action := req.Action
@@ -218,7 +221,7 @@ func (t *BaseTrader) preprocessAction(req *stmodel.ActionReq, subscription *stmo
 		subscription.RChan <- &stmodel.ActionResp{Action: action}
 		return nil, false
 	}
-	//Retrieve last single lot price
+	//Retrieve last single position price
 	prices, err := t.infoSrv.GetLastPrices([]string{action.InstrFigi}, t.ctx)
 	if err != nil || prices.GetByFigi(action.InstrFigi) == nil {
 		t.logger.Error("Error retrieving last prices by ", instrInfo.TradingStatus)
@@ -268,7 +271,7 @@ func (t *BaseTrader) procBuy(opInfo *trmodel.OpInfo, action *domain.Action, sub 
 		sub.RChan <- &stmodel.ActionResp{Action: action}
 		return
 	}
-	//Prepare request (currently only Market order type) and post order
+	//Prepare request and post order
 	orderId := uuid.New().String()
 	req := dtotapi.PostOrderRequest{
 		Figi:      action.InstrFigi,
@@ -277,6 +280,7 @@ func (t *BaseTrader) procBuy(opInfo *trmodel.OpInfo, action *domain.Action, sub 
 		AccountId: action.AccountID,
 		OrderId:   orderId,
 	}
+	//Prepare limited or market request depending on the algorithm request (algorithm must populate action.ReqPrice field)
 	if action.OrderType == domain.LIMITED && !action.ReqPrice.IsZero() {
 		req.OrderType = dtotapi.OrderTypeLimit
 		req.InstrPrice = t.normalizePriceDown(action.ReqPrice, opInfo.PriceStep)
@@ -293,7 +297,7 @@ func (t *BaseTrader) procBuy(opInfo *trmodel.OpInfo, action *domain.Action, sub 
 	}
 	t.logger.Infof("Posted buy order: %+v", order)
 	//Set amounts of money to action and update action status in db
-	action.TotalPrice = moneyAmount
+	action.TotalPrice = moneyAmount //will be updated to take into account commissions if succeed
 	action.LotAmount = lotAmount
 	t.orders.Put(order.OrderId, action)
 	t.setActionStatus(action, domain.POSTED, "Action posted successfully")
@@ -337,7 +341,7 @@ func (t *BaseTrader) procSell(opInfo *trmodel.OpInfo, action *domain.Action, sub
 	t.setActionStatus(action, domain.POSTED, "Sell order successfully posted")
 }
 
-//normalization required to take into account price step of instrument
+//normalization required to take into account minimum price step of instrument
 func (t *BaseTrader) normalizePriceUp(price decimal.Decimal, priceStep decimal.Decimal) decimal.Decimal {
 	if price.Mod(priceStep) != decimal.Zero {
 		return price.Div(priceStep).Ceil().Mul(priceStep)
