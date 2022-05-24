@@ -80,7 +80,7 @@ func (t *BaseTrader) checkOrdersBg() {
 			}
 			switch state.ExecStatus {
 			case dtotapi.ExecutionReportStatusFill:
-				action.Status = domain.SUCCESS
+				action.Status = domain.Success
 				action.Info = "Order successfully completed"
 				action.TotalPrice = state.TotalPrice.Value //Update total price to take into account commissions (from proto OrderState.total_order_amount)
 				action.Currency = state.TotalPrice.Currency
@@ -94,7 +94,7 @@ func (t *BaseTrader) checkOrdersBg() {
 				t.logger.Info("Order with id ", entry.Key, " completed")
 				sub.RChan <- &stmodel.ActionResp{Action: action}
 			case dtotapi.ExecutionReportStatusRejected:
-				action.Status = domain.FAILED
+				action.Status = domain.Failed
 				action.Info = "Order was rejected"
 				err = t.actionRep.Save(action)
 				if err != nil {
@@ -104,7 +104,7 @@ func (t *BaseTrader) checkOrdersBg() {
 				t.logger.Infof("Order with id %s rejected", entry.Key)
 				sub.RChan <- &stmodel.ActionResp{Action: action}
 			case dtotapi.ExecutionReportStatusCancelled:
-				action.Status = domain.CANCELED
+				action.Status = domain.Canceled
 				action.Info = "Order was canceled"
 				err = t.actionRep.Save(action)
 				if err != nil {
@@ -128,7 +128,7 @@ func (t *BaseTrader) checkOrdersBg() {
 					}
 					t.orders.Delete(entry.Key)
 					t.logger.Info("Order was canceled successfully: ", cResp)
-					action.Status = domain.CANCELED
+					action.Status = domain.Canceled
 					action.Info = "Order was canceled"
 					err = t.actionRep.Save(action) //Full save required to persist previously made changes
 					if err != nil {
@@ -162,7 +162,7 @@ func (t *BaseTrader) actionProcBg() {
 		if !ok {
 			continue
 		}
-		if action.Direction == domain.BUY {
+		if action.Direction == domain.Buy {
 			t.procBuy(opInfo, action, subscription)
 		} else {
 			t.procSell(opInfo, action, subscription)
@@ -178,7 +178,7 @@ func (t *BaseTrader) preprocessAction(req *stmodel.ActionReq, subscription *stmo
 	err := t.actionRep.Save(action)
 	if err != nil {
 		t.logger.Error("Error while saving action. Canceling operation... ", err)
-		t.setActionStatus(action, domain.FAILED, "Error while saving action")
+		t.setActionStatus(action, domain.Failed, "Error while saving action")
 		subscription.RChan <- &stmodel.ActionResp{Action: action}
 		return nil, false
 	}
@@ -186,7 +186,7 @@ func (t *BaseTrader) preprocessAction(req *stmodel.ActionReq, subscription *stmo
 	instrInfo, err := t.infoSrv.GetInstrumentInfoByFigi(action.InstrFigi, t.ctx)
 	if err != nil {
 		t.logger.Error("Error while requesting instrument info. Canceling operation, updating status...", err)
-		t.setActionStatus(action, domain.FAILED, "Error getting instrument info")
+		t.setActionStatus(action, domain.Failed, "Error getting instrument info")
 		subscription.RChan <- &stmodel.ActionResp{Action: action}
 		return nil, false
 	}
@@ -194,22 +194,22 @@ func (t *BaseTrader) preprocessAction(req *stmodel.ActionReq, subscription *stmo
 	//Check api available flag
 	if !instrInfo.ApiTradeAvailableFlag {
 		t.logger.Errorf("Instrument with figi %s not available for trading through API", action.InstrFigi)
-		t.setActionStatus(action, domain.FAILED, "Instrument operating through API not available")
+		t.setActionStatus(action, domain.Failed, "Instrument operating through API not available")
 		subscription.RChan <- &stmodel.ActionResp{Action: action}
 		return nil, false
 	}
 	//Check is specific operation available for instrument
-	if (!instrInfo.SellAvailableFlag && action.Direction == domain.SELL) ||
-		(!instrInfo.BuyAvailableFlag && action.Direction == domain.BUY) {
+	if (!instrInfo.SellAvailableFlag && action.Direction == domain.Sell) ||
+		(!instrInfo.BuyAvailableFlag && action.Direction == domain.Buy) {
 		t.logger.Errorf("Operation by instrument not available...")
-		t.setActionStatus(action, domain.FAILED, "Operation by instrument not available")
+		t.setActionStatus(action, domain.Failed, "Operation by instrument not available")
 		subscription.RChan <- &stmodel.ActionResp{Action: action}
 		return nil, false
 	}
 	//Check is trade session has ok status
 	if !instrInfo.IsTradingAvailable() {
 		t.logger.Warn("Exchange trading status has incorrect status.", instrInfo.TradingStatus)
-		t.setActionStatus(action, domain.FAILED, fmt.Sprintf("Exchange has incorrect status %d", instrInfo.TradingStatus))
+		t.setActionStatus(action, domain.Failed, fmt.Sprintf("Exchange has incorrect status %d", instrInfo.TradingStatus))
 		subscription.RChan <- &stmodel.ActionResp{Action: action}
 		return nil, false
 	}
@@ -217,7 +217,7 @@ func (t *BaseTrader) preprocessAction(req *stmodel.ActionReq, subscription *stmo
 		Currency: action.Currency, Lim: req.GetCurrLimit(action.Currency), PosInLot: instrInfo.Lot, PriceStep: instrInfo.MinPriceIncrement}
 	if opInfo.Lim.IsZero() {
 		t.logger.Warnf("Limit for currency %s not set, discarding order", action.Currency)
-		t.setActionStatus(action, domain.FAILED, "Limit by requested currency not set")
+		t.setActionStatus(action, domain.Failed, "Limit by requested currency not set")
 		subscription.RChan <- &stmodel.ActionResp{Action: action}
 		return nil, false
 	}
@@ -225,7 +225,7 @@ func (t *BaseTrader) preprocessAction(req *stmodel.ActionReq, subscription *stmo
 	prices, err := t.infoSrv.GetLastPrices([]string{action.InstrFigi}, t.ctx)
 	if err != nil || prices.GetByFigi(action.InstrFigi) == nil {
 		t.logger.Error("Error retrieving last prices by ", instrInfo.TradingStatus)
-		t.setActionStatus(action, domain.FAILED, "Error getting price by figi")
+		t.setActionStatus(action, domain.Failed, "Error getting price by figi")
 		subscription.RChan <- &stmodel.ActionResp{Action: action}
 		return nil, false
 	}
@@ -243,7 +243,7 @@ func (t *BaseTrader) procBuy(opInfo *trmodel.OpInfo, action *domain.Action, sub 
 	if lotPrice.GreaterThan(opInfo.Lim) {
 		t.logger.Warnf("Limit lower than minimal buy price, figi %s; limit: %s; lot price: %s; one price: %s",
 			action.InstrFigi, opInfo.Lim, opInfo.PosPrice, lotPrice)
-		t.setActionStatus(action, domain.FAILED, "Price of one buy exceeds limit")
+		t.setActionStatus(action, domain.Failed, "Price of one buy exceeds limit")
 		sub.RChan <- &stmodel.ActionResp{Action: action}
 		return
 	}
@@ -258,7 +258,7 @@ func (t *BaseTrader) procBuy(opInfo *trmodel.OpInfo, action *domain.Action, sub 
 	positions, err := t.infoSrv.GetPositions(&posReq, t.ctx)
 	if err != nil {
 		t.logger.Error("Error getting positions ", err)
-		t.setActionStatus(action, domain.FAILED, "Error while getting positions")
+		t.setActionStatus(action, domain.Failed, "Error while getting positions")
 		sub.RChan <- &stmodel.ActionResp{Action: action}
 		return
 	}
@@ -267,7 +267,7 @@ func (t *BaseTrader) procBuy(opInfo *trmodel.OpInfo, action *domain.Action, sub 
 	if moneyAvail == nil || moneyAvail.Value.LessThan(moneyAmount) {
 		t.logger.Warnf("Not enough money for figi %s;  lot price: %s; lot num: %d; required money: %s; available money: %s",
 			action.InstrFigi, opInfo.PosPrice, opInfo.PosInLot, moneyAmount, moneyAvail)
-		t.setActionStatus(action, domain.FAILED, fmt.Sprintf("No money for operation"))
+		t.setActionStatus(action, domain.Failed, fmt.Sprintf("No money for operation"))
 		sub.RChan <- &stmodel.ActionResp{Action: action}
 		return
 	}
@@ -281,7 +281,7 @@ func (t *BaseTrader) procBuy(opInfo *trmodel.OpInfo, action *domain.Action, sub 
 		OrderId:   orderId,
 	}
 	//Prepare limited or market request depending on the algorithm request (algorithm must populate action.ReqPrice field)
-	if action.OrderType == domain.LIMITED && !action.ReqPrice.IsZero() {
+	if action.OrderType == domain.Limited && !action.ReqPrice.IsZero() {
 		req.OrderType = dtotapi.OrderTypeLimit
 		req.InstrPrice = t.normalizePriceDown(action.ReqPrice, opInfo.PriceStep)
 	} else {
@@ -291,7 +291,7 @@ func (t *BaseTrader) procBuy(opInfo *trmodel.OpInfo, action *domain.Action, sub 
 	order, err := t.tradeSrv.PostOrder(&req, t.ctx)
 	if err != nil {
 		t.logger.Errorf("Error posting sell order %+v: %s, response: %v", req, err, order)
-		t.setActionStatus(action, domain.FAILED, "Error while posting buy order")
+		t.setActionStatus(action, domain.Failed, "Error while posting buy order")
 		sub.RChan <- &stmodel.ActionResp{Action: action}
 		return
 	}
@@ -300,7 +300,7 @@ func (t *BaseTrader) procBuy(opInfo *trmodel.OpInfo, action *domain.Action, sub 
 	action.TotalPrice = moneyAmount //will be updated to take into account commissions if succeed
 	action.LotAmount = lotAmount
 	t.orders.Put(order.OrderId, action)
-	t.setActionStatus(action, domain.POSTED, "Action posted successfully")
+	t.setActionStatus(action, domain.Posted, "Action posted successfully")
 }
 
 //Process sell order (currently there's no limits for a sell operation)
@@ -308,7 +308,7 @@ func (t *BaseTrader) procSell(opInfo *trmodel.OpInfo, action *domain.Action, sub
 	//Check is requested instrument amount for a sell not zero
 	if action.LotAmount == 0 {
 		t.logger.Warn("LotAmount is 0 - nothing to sell")
-		t.setActionStatus(action, domain.FAILED, "No instrument to sell found")
+		t.setActionStatus(action, domain.Failed, "No instrument to sell found")
 		sub.RChan <- &stmodel.ActionResp{Action: action}
 		return
 	}
@@ -321,7 +321,7 @@ func (t *BaseTrader) procSell(opInfo *trmodel.OpInfo, action *domain.Action, sub
 		AccountId: action.AccountID,
 		OrderId:   orderId,
 	}
-	if action.OrderType == domain.LIMITED && !action.ReqPrice.IsZero() {
+	if action.OrderType == domain.Limited && !action.ReqPrice.IsZero() {
 		req.OrderType = dtotapi.OrderTypeLimit
 		req.InstrPrice = t.normalizePriceUp(action.ReqPrice, opInfo.PriceStep)
 	} else {
@@ -331,14 +331,14 @@ func (t *BaseTrader) procSell(opInfo *trmodel.OpInfo, action *domain.Action, sub
 	order, err := t.tradeSrv.PostOrder(&req, t.ctx)
 	if err != nil {
 		t.logger.Errorf("Error posting sell order %+v: %s, response: %v", req, err, order)
-		t.setActionStatus(action, domain.FAILED, "Error while posting buy order")
+		t.setActionStatus(action, domain.Failed, "Error while posting buy order")
 		sub.RChan <- &stmodel.ActionResp{Action: action}
 		return
 	}
 	//Populating orders map to further state monitoring and responding
 	t.orders.Put(order.OrderId, action)
 	t.logger.Info("Posted sell order ", order)
-	t.setActionStatus(action, domain.POSTED, "Sell order successfully posted")
+	t.setActionStatus(action, domain.Posted, "Sell order successfully posted")
 }
 
 //normalization required to take into account minimum price step of instrument
