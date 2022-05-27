@@ -77,6 +77,14 @@ func ParamsToMap(params []*Param) map[string]string {
 	return res
 }
 
+func ContextToMap(params []*CtxParam) map[string]string {
+	res := make(map[string]string, len(params))
+	for _, param := range params {
+		res[param.Key] = param.Value
+	}
+	return res
+}
+
 //CopyNoParam is utility method for parameter variation.
 //Copies algorithm without parameters
 func (alg *Algorithm) CopyNoParam() *Algorithm {

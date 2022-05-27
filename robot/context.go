@@ -19,7 +19,7 @@ func GetContext() *Context {
 }
 
 //Initializes application context and populate it with objects
-func init() {
+func initConfiguration() {
 	logConf := zap.NewDevelopmentConfig()
 	if helper.GetLogFilePath() != "" {
 		logConf.OutputPaths = []string{
@@ -120,6 +120,13 @@ func (ctx *Context) GetLogger() *zap.SugaredLogger {
 
 func (ctx *Context) GetStatService() service.StatService {
 	return ctx.statSrv
+}
+
+func Init() {
+	helper.InitEnv()
+	helper.InitDB()
+	helper.InitGRPC()
+	initConfiguration()
 }
 
 //StartBgTasks start required background tasks.
