@@ -2,10 +2,12 @@ package avr
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/shopspring/decimal"
 	"github.com/tevino/abool/v2"
 	"go.uber.org/zap"
 	"invest-robot/domain"
+	"invest-robot/dto"
 	"invest-robot/errors"
 	"invest-robot/repository"
 	"invest-robot/service"
@@ -166,6 +168,7 @@ func (a *AlgorithmImpl) processTraderResp(aDat *AlgoData, resp *stmodel.ActionRe
 	}
 	a.logger.Infof("Trader response processed, algo data: %+v", aDat)
 	aDat.status = process
+	a.updateState()
 	return nil
 }
 
@@ -231,6 +234,36 @@ func (a *AlgorithmImpl) processData(aDat *AlgoData, pDat *procData) {
 	}
 }
 
+//updateState updates algorithm context parameters from current state
+func (a *AlgorithmImpl) updateState() {
+	instruments := make([]*dto.InstrumentInfo, 0)
+	for figi, amount := range a.instrAmount {
+		info := dto.InstrumentInfo{
+			Figi:   figi,
+			Amount: amount,
+		}
+		if price, ok := a.buyPrice[figi]; ok {
+			info.BuyPosPrice = price
+		}
+		instruments = append(instruments, &info)
+	}
+	res, err := json.Marshal(instruments)
+	if err == nil {
+		param, ok := a.algorithm.GetCtxParam(dto.InstrAmountField)
+		if !ok {
+			param = &domain.CtxParam{
+				ID:          0,
+				AlgorithmID: a.id,
+				Key:         dto.InstrAmountField,
+				Value:       string(res),
+			}
+			a.algorithm.CtxParams = append(a.algorithm.CtxParams, param)
+		} else {
+			param.Value = string(res)
+		}
+	}
+}
+
 func (a *AlgorithmImpl) makeReq(action *domain.Action) *stmodel.ActionReq {
 	return &stmodel.ActionReq{
 		Action: action,
@@ -253,6 +286,10 @@ func (a *AlgorithmImpl) stopInternal() {
 }
 
 func (a *AlgorithmImpl) Configure(ctx []*domain.CtxParam) error {
+	if ctx == nil {
+		a.logger.Infof("Algorihtm %d configuration not set, skipping", a.id)
+		return nil
+	}
 	ctxParam := domain.ContextToMap(ctx)
 
 	return configure(ctxParam, &algoState{
@@ -304,7 +341,7 @@ func newAvr(algo *domain.Algorithm, logger *zap.SugaredLogger, proc DataProc) (s
 	paramMap := domain.ParamsToMap(algo.Params)
 	//Set order expiration time in seconds (when using limited requests), default 5 min
 	ordExpInt := getOrDefaultInt(paramMap, OrderExpiration, 300)
-	return &AlgorithmImpl{
+	algorthm := &AlgorithmImpl{
 		id:          algo.ID,
 		isActive:    abool.NewBool(true),
 		accountId:   algo.AccountId,
@@ -319,7 +356,13 @@ func newAvr(algo *domain.Algorithm, logger *zap.SugaredLogger, proc DataProc) (s
 		ordExp:      time.Duration(ordExpInt) * time.Second,
 		commission:  getOrDefaultDecimal(paramMap, Commission, decimal.NewFromFloat(0.04)).Div(decimal.NewFromInt(100)),
 		instrAmount: make(map[string]int64),
-	}, nil
+	}
+	if err := algorthm.Configure(algo.CtxParams); err != nil {
+		logger.Errorf("Failed configure algorithm %d with configuration %+v", algo.ID, algo.CtxParams)
+		return nil, err
+	}
+
+	return algorthm, nil
 }
 
 func getOrDefaultDecimal(paramMap map[string]string, param string, def decimal.Decimal) decimal.Decimal {

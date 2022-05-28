@@ -17,6 +17,7 @@ type AlgorithmResponse struct {
 	MoneyLimits []*MoneyValue     `json:"moneyLimits"`
 	Params      map[string]string `json:"params"`
 	IsActive    bool              `json:"isActive"`
+	InstrAvail  *InstrumentsInfo  `json:"instrAvail"` //Information about available instruments for algorithm
 	CreatedAt   time.Time         `json:"createdAt"`
 	UpdatedAt   time.Time         `json:"updatedAt"`
 }

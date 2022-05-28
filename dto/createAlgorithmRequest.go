@@ -1,6 +1,8 @@
 package dto
 
-import "github.com/shopspring/decimal"
+import (
+	"github.com/shopspring/decimal"
+)
 
 //CreateAlgorithmRequest request to create new trade algorithm or history algorithm config
 type CreateAlgorithmRequest struct {
@@ -9,7 +11,7 @@ type CreateAlgorithmRequest struct {
 	Strategy  string            `json:"strategy"`
 	Limits    []MoneyValue      `json:"limits"` //Algorithm limits on using money
 	Params    map[string]string `json:"params"`
-	InstrInit []InstrumentValue `json:"instrInit"` //Optional - to specify initial instrument available
+	InstrInit *InstrumentsInfo  `json:"instrInit"` //Optional - to specify initial instrument available
 }
 
 type MoneyValue struct {
