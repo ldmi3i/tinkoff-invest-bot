@@ -62,7 +62,7 @@ const (
 )
 
 type AlgoData struct {
-	status      algoStatus
+	statusMap   map[string]algoStatus //Algorithm status by every instrument (not block all algorithm with one instrument operation)
 	prev        map[string]decimal.Decimal
 	instrAmount map[string]int64
 }
@@ -106,8 +106,12 @@ func (a *AlgorithmImpl) procBg(datCh <-chan procData) {
 		close(a.aChan)
 		a.logger.Infof("Stopping algorithm background; ID: %d", a.id)
 	}()
+	statusMap := make(map[string]algoStatus)
+	for _, figi := range a.figis {
+		statusMap[figi] = process
+	}
 	aDat := AlgoData{ //Algorithm data storing as single thread state
-		status:      process,
+		statusMap:   statusMap,
 		prev:        make(map[string]decimal.Decimal),
 		instrAmount: a.instrAmount,
 	}
@@ -167,7 +171,7 @@ func (a *AlgorithmImpl) processTraderResp(aDat *AlgoData, resp *stmodel.ActionRe
 		a.logger.Infof("Operation failed %+v", resp)
 	}
 	a.logger.Infof("Trader response processed, algo data: %+v", aDat)
-	aDat.status = process
+	aDat.statusMap[action.InstrFigi] = process
 	a.updateState()
 	return nil
 }
@@ -177,8 +181,11 @@ func (a *AlgorithmImpl) processData(aDat *AlgoData, pDat *procData) {
 	currDiff := pDat.SAV.Sub(pDat.LAV)
 	a.logger.Debugf("Difference, current: %s, prev: %s, price: %s", currDiff, prevDiff, pDat.Price)
 	aDat.prev[pDat.Figi] = currDiff
-	if aDat.status != process {
-		a.logger.Debugf("Waiting in status: %d", aDat.status)
+	status, ok := aDat.statusMap[pDat.Figi]
+	if !ok {
+		aDat.statusMap[pDat.Figi] = process
+	} else if status != process {
+		a.logger.Debugf("Waiting in status: %d", status)
 		return
 	}
 	if exists && prevDiff.IsNegative() && currDiff.IsPositive() {
@@ -200,7 +207,7 @@ func (a *AlgorithmImpl) processData(aDat *AlgoData, pDat *procData) {
 		}
 		a.logger.Infof("Conditions for Buy, requesting action: %+v", action)
 		a.aChan <- a.makeReq(&action)
-		aDat.status = waitRes
+		aDat.statusMap[pDat.Figi] = waitRes
 	} else if exists && prevDiff.IsPositive() && currDiff.IsNegative() {
 		amount, iExists := aDat.instrAmount[pDat.Figi]
 		buyPrice, ok := a.buyPrice[pDat.Figi]
@@ -229,7 +236,7 @@ func (a *AlgorithmImpl) processData(aDat *AlgoData, pDat *procData) {
 			}
 			a.logger.Infof("Conditions for Sell, requesting action: %+v", action)
 			a.aChan <- a.makeReq(&action)
-			aDat.status = waitRes
+			aDat.statusMap[pDat.Figi] = waitRes
 		}
 	}
 }
