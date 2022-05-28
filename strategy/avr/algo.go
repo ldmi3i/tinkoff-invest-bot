@@ -2,10 +2,12 @@ package avr
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/shopspring/decimal"
 	"github.com/tevino/abool/v2"
 	"go.uber.org/zap"
 	"invest-robot/domain"
+	"invest-robot/dto"
 	"invest-robot/errors"
 	"invest-robot/repository"
 	"invest-robot/service"
@@ -26,22 +28,23 @@ import (
 //Important note! Currently, at start algorithm assumes that there is no available instruments to sell (it may be added in future as parameter or domain.Algorithm)
 //So at start algorithm search for buy conditions and only after that it cat make sell operations
 type AlgorithmImpl struct {
-	id         uint                       //Algorithm id extracted for more convenience
-	isActive   *abool.AtomicBool          //Atomic bool indicating is algorithm active
-	dataProc   DataProc                   //Data processor - provides data as the channel for algorithm
-	accountId  string                     //Account id extracted for more convenience
-	figis      []string                   //List of figis to monitor and use in algorithm
-	limits     []*domain.MoneyLimit       //Limits of money available to algorithm
-	algorithm  *domain.Algorithm          //Link to original object which algorithm based
-	param      map[string]string          //Map of different algorithm configuration parameters (order expiration time etc)
-	aChan      chan *stmodel.ActionReq    //Channel to send order requests to trader
-	arChan     chan *stmodel.ActionResp   //Channel to receive responses from trader about action result
-	stopCh     chan bool                  //Channel to stop algorithm when required
-	buyPrice   map[string]decimal.Decimal //Cache of buy prices made previously (when sell go after buy - it clears record) - to prevent selling cheaper than previous buy
-	ordExp     time.Duration              //Expiration duration of posted orders - when expiration time passed and order not finished then it will be canceled
-	commission decimal.Decimal            //Commission on deals to take into account
-	ctx        context.Context
-	cancelF    context.CancelFunc
+	id          uint                       //Algorithm id extracted for more convenience
+	isActive    *abool.AtomicBool          //Atomic bool indicating is algorithm active
+	dataProc    DataProc                   //Data processor - provides data as the channel for algorithm
+	accountId   string                     //Account id extracted for more convenience
+	figis       []string                   //List of figis to monitor and use in algorithm
+	limits      []*domain.MoneyLimit       //Limits of money available for algorithm
+	algorithm   *domain.Algorithm          //Link to original object which algorithm based
+	param       map[string]string          //Map of different algorithm configuration parameters (order expiration time etc)
+	aChan       chan *stmodel.ActionReq    //Channel to send order requests to trader
+	arChan      chan *stmodel.ActionResp   //Channel to receive responses from trader about action result
+	stopCh      chan bool                  //Channel to stop algorithm when required
+	buyPrice    map[string]decimal.Decimal //Cache of buy prices made previously (when sell goes after buy - it clears record) - to prevent selling cheaper than previous buy
+	ordExp      time.Duration              //Expiration duration of posted orders - when expiration time passed and order not finished then it will be canceled
+	commission  decimal.Decimal            //Commission on deals to take into account
+	ctx         context.Context
+	cancelF     context.CancelFunc
+	instrAmount map[string]int64 //Initial amount of instruments available
 
 	logger *zap.SugaredLogger
 }
@@ -103,10 +106,10 @@ func (a *AlgorithmImpl) procBg(datCh <-chan procData) {
 		close(a.aChan)
 		a.logger.Infof("Stopping algorithm background; ID: %d", a.id)
 	}()
-	aDat := AlgoData{
+	aDat := AlgoData{ //Algorithm data storing as single thread state
 		status:      process,
 		prev:        make(map[string]decimal.Decimal),
-		instrAmount: make(map[string]int64),
+		instrAmount: a.instrAmount,
 	}
 	a.logger.Infof("Starting background algorithm processing; id: %d , strategy: avr , limits: %+v",
 		a.id, a.limits)
@@ -138,7 +141,7 @@ func (a *AlgorithmImpl) procBg(datCh <-chan procData) {
 	}
 }
 
-//process response from trade.Trader after pass trading stages
+//process response from trade.Trader after requested passed trading stages
 func (a *AlgorithmImpl) processTraderResp(aDat *AlgoData, resp *stmodel.ActionResp) error {
 	action := resp.Action
 	a.logger.Debug("Processing trader response: ", *resp.Action)
@@ -165,6 +168,7 @@ func (a *AlgorithmImpl) processTraderResp(aDat *AlgoData, resp *stmodel.ActionRe
 	}
 	a.logger.Infof("Trader response processed, algo data: %+v", aDat)
 	aDat.status = process
+	a.updateState()
 	return nil
 }
 
@@ -230,6 +234,36 @@ func (a *AlgorithmImpl) processData(aDat *AlgoData, pDat *procData) {
 	}
 }
 
+//updateState updates algorithm context parameters from current state
+func (a *AlgorithmImpl) updateState() {
+	instruments := make([]*dto.InstrumentInfo, 0)
+	for figi, amount := range a.instrAmount {
+		info := dto.InstrumentInfo{
+			Figi:   figi,
+			Amount: amount,
+		}
+		if price, ok := a.buyPrice[figi]; ok {
+			info.BuyPosPrice = price
+		}
+		instruments = append(instruments, &info)
+	}
+	res, err := json.Marshal(instruments)
+	if err == nil {
+		param, ok := a.algorithm.GetCtxParam(dto.InstrAmountField)
+		if !ok {
+			param = &domain.CtxParam{
+				ID:          0,
+				AlgorithmID: a.id,
+				Key:         dto.InstrAmountField,
+				Value:       string(res),
+			}
+			a.algorithm.CtxParams = append(a.algorithm.CtxParams, param)
+		} else {
+			param.Value = string(res)
+		}
+	}
+}
+
 func (a *AlgorithmImpl) makeReq(action *domain.Action) *stmodel.ActionReq {
 	return &stmodel.ActionReq{
 		Action: action,
@@ -251,8 +285,17 @@ func (a *AlgorithmImpl) stopInternal() {
 	a.logger.Infof("Algorithm %d successfully stopped", a.algorithm.ID)
 }
 
-func (a *AlgorithmImpl) Configure(ctx []domain.CtxParam) error {
-	return errors.NewNotImplemented()
+func (a *AlgorithmImpl) Configure(ctx []*domain.CtxParam) error {
+	if ctx == nil {
+		a.logger.Infof("Algorihtm %d configuration not set, skipping", a.id)
+		return nil
+	}
+	ctxParam := domain.ContextToMap(ctx)
+
+	return configure(ctxParam, &algoState{
+		InitAmount: a.instrAmount,
+		BuyPrice:   a.buyPrice,
+	}, a.logger)
 }
 
 func (a *AlgorithmImpl) GetParam() map[string]string {
@@ -263,7 +306,7 @@ func (a *AlgorithmImpl) GetAlgorithm() *domain.Algorithm {
 	return a.algorithm
 }
 
-//NewProd constructs new algorithm using production data procesor
+//NewProd constructs new algorithm using production data processor
 func NewProd(algo *domain.Algorithm, infoSrv service.InfoSrv, logger *zap.SugaredLogger) (stmodel.Algorithm, error) {
 	proc, err := newDataProc(algo, infoSrv, logger)
 	if err != nil {
@@ -298,21 +341,28 @@ func newAvr(algo *domain.Algorithm, logger *zap.SugaredLogger, proc DataProc) (s
 	paramMap := domain.ParamsToMap(algo.Params)
 	//Set order expiration time in seconds (when using limited requests), default 5 min
 	ordExpInt := getOrDefaultInt(paramMap, OrderExpiration, 300)
-	return &AlgorithmImpl{
-		id:         algo.ID,
-		isActive:   abool.NewBool(true),
-		accountId:  algo.AccountId,
-		dataProc:   proc,
-		figis:      algo.Figis,
-		limits:     algo.MoneyLimits,
-		param:      paramMap,
-		algorithm:  algo,
-		buyPrice:   make(map[string]decimal.Decimal),
-		stopCh:     make(chan bool),
-		logger:     logger,
-		ordExp:     time.Duration(ordExpInt) * time.Second,
-		commission: getOrDefaultDecimal(paramMap, Commission, decimal.NewFromFloat(0.04)).Div(decimal.NewFromInt(100)),
-	}, nil
+	algorthm := &AlgorithmImpl{
+		id:          algo.ID,
+		isActive:    abool.NewBool(true),
+		accountId:   algo.AccountId,
+		dataProc:    proc,
+		figis:       algo.Figis,
+		limits:      algo.MoneyLimits,
+		param:       paramMap,
+		algorithm:   algo,
+		buyPrice:    make(map[string]decimal.Decimal),
+		stopCh:      make(chan bool),
+		logger:      logger,
+		ordExp:      time.Duration(ordExpInt) * time.Second,
+		commission:  getOrDefaultDecimal(paramMap, Commission, decimal.NewFromFloat(0.04)).Div(decimal.NewFromInt(100)),
+		instrAmount: make(map[string]int64),
+	}
+	if err := algorthm.Configure(algo.CtxParams); err != nil {
+		logger.Errorf("Failed configure algorithm %d with configuration %+v", algo.ID, algo.CtxParams)
+		return nil, err
+	}
+
+	return algorthm, nil
 }
 
 func getOrDefaultDecimal(paramMap map[string]string, param string, def decimal.Decimal) decimal.Decimal {

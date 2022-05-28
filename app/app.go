@@ -16,6 +16,7 @@ func Start() {
 		}
 	}()
 
+	robot.Init()
 	robot.StartBgTasks()
 	http.StartHttp()
 }

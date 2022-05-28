@@ -9,7 +9,7 @@ import (
 
 var cl *grpc.ClientConn
 
-func initGRPC() {
+func InitGRPC() {
 	addr := GetGRPCAddress()
 	config := &tls.Config{
 		InsecureSkipVerify: true,

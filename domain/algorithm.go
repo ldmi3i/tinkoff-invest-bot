@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"encoding/json"
+	"fmt"
 	"github.com/lib/pq"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
@@ -25,7 +27,7 @@ func (alg *Algorithm) ToDto() *dto.AlgorithmResponse {
 	for _, lim := range alg.MoneyLimits {
 		limits = append(limits, lim.ToDto())
 	}
-	return &dto.AlgorithmResponse{
+	algResp := dto.AlgorithmResponse{
 		AlgorithmID: alg.ID,
 		Strategy:    alg.Strategy,
 		AccountId:   alg.AccountId,
@@ -36,6 +38,14 @@ func (alg *Algorithm) ToDto() *dto.AlgorithmResponse {
 		CreatedAt:   alg.CreatedAt,
 		UpdatedAt:   alg.UpdatedAt,
 	}
+
+	if instrInfoStr, ok := alg.GetCtxParam(dto.InstrAmountField); ok {
+		var instrInfo dto.InstrumentsInfo
+		if err := json.Unmarshal([]byte(instrInfoStr.Value), &instrInfo); err == nil {
+			algResp.InstrAvail = &instrInfo
+		}
+	}
+	return &algResp
 }
 
 //Param represents algorithm parametrization by key/value map
@@ -52,6 +62,10 @@ type CtxParam struct {
 	AlgorithmID uint
 	Key         string
 	Value       string
+}
+
+func (ctp *CtxParam) String() string {
+	return fmt.Sprintf("ID: %d, AlgorithmID: %d, Key: %s, Value: %s", ctp.ID, ctp.AlgorithmID, ctp.Key, ctp.Value)
 }
 
 //MoneyLimit represents limits on the use of money
@@ -77,6 +91,14 @@ func ParamsToMap(params []*Param) map[string]string {
 	return res
 }
 
+func ContextToMap(params []*CtxParam) map[string]string {
+	res := make(map[string]string, len(params))
+	for _, param := range params {
+		res[param.Key] = param.Value
+	}
+	return res
+}
+
 //CopyNoParam is utility method for parameter variation.
 //Copies algorithm without parameters
 func (alg *Algorithm) CopyNoParam() *Algorithm {
@@ -90,10 +112,29 @@ func (alg *Algorithm) CopyNoParam() *Algorithm {
 	}
 }
 
+//GetCtxParam returns CtxParam by param name and flag is requested parameter exits
+func (alg *Algorithm) GetCtxParam(paramName string) (*CtxParam, bool) {
+	for _, param := range alg.CtxParams {
+		if param.Key == paramName {
+			return param, true
+		}
+	}
+	return nil, false
+}
+
 func AlgorithmFromDto(req *dto.CreateAlgorithmRequest) *Algorithm {
 	params := make([]*Param, 0, len(req.Params))
 	for key, val := range req.Params {
 		params = append(params, &Param{Key: key, Value: val})
+	}
+
+	ctxParam := make([]*CtxParam, 0)
+	if val, err := json.Marshal(req.InstrInit); err == nil {
+		param := CtxParam{
+			Key:   dto.InstrAmountField,
+			Value: string(val),
+		}
+		ctxParam = append(ctxParam, &param)
 	}
 	limits := make([]*MoneyLimit, 0, len(req.Limits))
 	for _, lim := range req.Limits {
@@ -109,6 +150,7 @@ func AlgorithmFromDto(req *dto.CreateAlgorithmRequest) *Algorithm {
 		MoneyLimits: limits,
 		Params:      params,
 		AccountId:   req.AccountId,
+		CtxParams:   ctxParam,
 		IsActive:    true,
 	}
 }
