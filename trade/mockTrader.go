@@ -152,6 +152,10 @@ func (t *MockTrader) procSell(opInfo trmodel.OpInfo, action *domain.Action, trDa
 	moneyAmount := price.Mul(decimal.NewFromInt(action.LotAmount * opInfo.PosInLot)) //Money amount is a price multiplied by num of positions
 	trDat.ResAmount[opInfo.Currency] = trDat.ResAmount[opInfo.Currency].Add(moneyAmount)
 	trDat.ResInstr[action.InstrFigi] = trDat.ResInstr[action.InstrFigi] - action.LotAmount
+	//Negative amount of instrument not allowed, means initial amount of instrument existed
+	if trDat.ResInstr[action.InstrFigi] < 0 {
+		trDat.ResInstr[action.InstrFigi] = 0
+	}
 	action.TotalPrice = moneyAmount
 	trDat.SellOper += 1
 	t.sub.RChan <- t.getRespWithStatus(action, domain.Success)
