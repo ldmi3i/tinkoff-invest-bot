@@ -22,6 +22,7 @@ type procData struct {
 	Time  time.Time
 	LAV   decimal.Decimal //average by long window
 	SAV   decimal.Decimal //average by short window
+	DER   decimal.Decimal //Short window current derivative
 	Price decimal.Decimal //current price
 }
 
@@ -31,10 +32,10 @@ const (
 	LongDur  string = "long_dur"  //Long window length in sec
 )
 
-func calcAvg(lst *collections.TList[decimal.Decimal]) (*decimal.Decimal, error) {
+func calcAvg(lst *collections.TList[decimal.Decimal]) (decimal.Decimal, error) {
 	if lst.IsEmpty() {
 		log.Println("Requested average of empty list...")
-		return nil, errors.NewUnexpectedError("requested average calc on empty list")
+		return decimal.Zero, errors.NewUnexpectedError("requested average calc on empty list")
 	}
 	cnt := 0
 	sum := decimal.Zero
@@ -43,5 +44,5 @@ func calcAvg(lst *collections.TList[decimal.Decimal]) (*decimal.Decimal, error) 
 		sum = sum.Add(next.GetData())
 	}
 	res := sum.Div(decimal.NewFromInt(int64(cnt)))
-	return &res, nil
+	return res, nil
 }

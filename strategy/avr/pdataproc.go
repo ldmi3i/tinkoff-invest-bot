@@ -83,6 +83,7 @@ func (d *DataProcProd) procBg() {
 		return
 	}
 	go d.processDataInBg()
+	prevSav := decimal.Zero
 OUT:
 	for {
 		select {
@@ -121,10 +122,12 @@ OUT:
 			dat := procData{
 				Figi:  candle.Figi,
 				Time:  dTime,
-				LAV:   *lav,
-				SAV:   *sav,
+				LAV:   lav,
+				SAV:   sav,
+				DER:   sav.Sub(prevSav).Mul(decimal.NewFromInt(int64(savL.GetSize()))),
 				Price: price,
 			}
+			prevSav = sav
 			d.logger.Debugf("Sending data for alg %d: %+v", d.algoId, dat)
 			d.dtCh <- dat
 		case <-d.ctx.Done():

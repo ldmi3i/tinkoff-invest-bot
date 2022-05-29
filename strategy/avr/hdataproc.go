@@ -56,13 +56,14 @@ func (d *DbDataProc) procBg() {
 	}()
 	sOk := false
 	lOk := false
+	prevSav := decimal.Zero
 	for _, hDat := range d.hist {
 		select {
 		case <-d.ctx.Done():
 			d.logger.Info("Canceled context, stopping processor...")
 			return
 		default:
-			d.logger.Debugf("Processing data %+v", hDat)
+			//d.logger.Debugf("Processing data %+v", hDat)
 			sPop := d.sav.Append(hDat.Close, hDat.Time)
 			lPop := d.lav.Append(hDat.Close, hDat.Time)
 			sOk = sOk || sPop
@@ -81,10 +82,12 @@ func (d *DbDataProc) procBg() {
 				dat := procData{
 					Figi:  hDat.Figi,
 					Time:  hDat.Time,
-					LAV:   *lav,
-					SAV:   *sav,
+					LAV:   lav,
+					SAV:   sav,
+					DER:   sav.Sub(prevSav).Mul(decimal.NewFromInt(int64(d.sav.GetSize()))),
 					Price: hDat.Close,
 				}
+				prevSav = sav
 				d.logger.Debugf("Sending data: %+v", dat)
 				d.dtCh <- dat
 				time.Sleep(1 * time.Millisecond) //To provide time for mockTrader to finish operation
