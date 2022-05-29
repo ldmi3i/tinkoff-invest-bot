@@ -128,6 +128,8 @@ func AlgorithmFromDto(req *dto.CreateAlgorithmRequest) *Algorithm {
 		params = append(params, &Param{Key: key, Value: val})
 	}
 
+	//Pre-populate context with serialized initial amount of available instruments
+	//Set instrument amount to context because it's relates to algorithm state, not configuration
 	ctxParam := make([]*CtxParam, 0)
 	if val, err := json.Marshal(req.InstrInit); err == nil {
 		param := CtxParam{
