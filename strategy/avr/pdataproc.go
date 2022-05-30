@@ -109,12 +109,12 @@ OUT:
 			savL.Append(price, dTime)
 			lavL.Append(price, dTime)
 
-			sav, err := calcAvg(savL)
+			sav, err := calcAvr(savL)
 			if err != nil {
 				d.logger.Errorf("Error while calculating short average %d: %s", d.algoId, err)
 				break
 			}
-			lav, err := calcAvg(lavL)
+			lav, err := calcAvr(lavL)
 			if err != nil {
 				d.logger.Errorf("Error while calculating long average %d: %s", d.algoId, err)
 				break

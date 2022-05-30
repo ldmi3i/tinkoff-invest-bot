@@ -3,6 +3,7 @@ package avr
 import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
+	"invest-robot/dto"
 	"testing"
 )
 
@@ -17,7 +18,7 @@ func TestConfigure(t *testing.T) {
 			]
 		}`
 	confMap := make(map[string]string)
-	confMap[instrAmountField] = config
+	confMap[dto.InstrAmountField] = config
 	var state algoState
 
 	err := configure(confMap, &state, zap.NewExample().Sugar())

@@ -26,6 +26,10 @@ func (n TListNode[T]) GetData() T {
 	return n.data
 }
 
+func (n TListNode[T]) GetTime() time.Time {
+	return n.time
+}
+
 func (n TListNode[T]) Next() *TListNode[T] {
 	return n.next
 }

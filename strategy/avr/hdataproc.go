@@ -20,8 +20,8 @@ type DbDataProc struct {
 	logger *zap.SugaredLogger
 	ctx    context.Context
 
-	sav collections.TList[decimal.Decimal]
-	lav collections.TList[decimal.Decimal]
+	savMap map[string]*collections.TList[decimal.Decimal]
+	lavMap map[string]*collections.TList[decimal.Decimal]
 }
 
 func (d *DbDataProc) GetDataStream() (<-chan procData, error) {
@@ -37,8 +37,12 @@ func (d *DbDataProc) GetDataStream() (<-chan procData, error) {
 	if err != nil {
 		return nil, err
 	}
-	d.sav = collections.NewTList[decimal.Decimal](time.Duration(shortDur) * time.Second)
-	d.lav = collections.NewTList[decimal.Decimal](time.Duration(longDur) * time.Second)
+	for _, figi := range d.figis {
+		sav := collections.NewTList[decimal.Decimal](time.Duration(shortDur) * time.Second)
+		lav := collections.NewTList[decimal.Decimal](time.Duration(longDur) * time.Second)
+		d.savMap[figi] = &sav
+		d.lavMap[figi] = &lav
+	}
 	return d.dtCh, nil
 }
 
@@ -63,18 +67,24 @@ func (d *DbDataProc) procBg() {
 			d.logger.Info("Canceled context, stopping processor...")
 			return
 		default:
+			savL, ok := d.savMap[hDat.Figi]
+			if !ok {
+				d.logger.Infof("WARN received figi that not presented in listening list, id")
+				continue
+			}
+			lavL := d.lavMap[hDat.Figi]
 			//d.logger.Debugf("Processing data %+v", hDat)
-			sPop := d.sav.Append(hDat.Close, hDat.Time)
-			lPop := d.lav.Append(hDat.Close, hDat.Time)
+			sPop := savL.Append(hDat.Close, hDat.Time)
+			lPop := lavL.Append(hDat.Close, hDat.Time)
 			sOk = sOk || sPop
 			lOk = lOk || lPop
 			if sOk && lOk {
-				sav, err := calcAvg(&d.sav)
+				sav, err := calcAvr(savL)
 				if err != nil {
 					d.logger.Errorf("Error while calculating short average:\n%s", err)
 					break
 				}
-				lav, err := calcAvg(&d.lav)
+				lav, err := calcAvr(lavL)
 				if err != nil {
 					d.logger.Errorf("Error while calculating long average:\n%s", err)
 					break
@@ -84,7 +94,7 @@ func (d *DbDataProc) procBg() {
 					Time:  hDat.Time,
 					LAV:   lav,
 					SAV:   sav,
-					DER:   sav.Sub(prevSav).Mul(decimal.NewFromInt(int64(d.sav.GetSize()))),
+					DER:   sav.Sub(prevSav).Mul(decimal.NewFromInt(int64(savL.GetSize()))),
 					Price: hDat.Close,
 				}
 				prevSav = sav
@@ -102,6 +112,8 @@ func newHistoryDataProc(req *domain.Algorithm, rep repository.HistoryRepository,
 		figis:  req.Figis,
 		rep:    rep,
 		dtCh:   make(chan procData),
+		savMap: make(map[string]*collections.TList[decimal.Decimal]),
+		lavMap: make(map[string]*collections.TList[decimal.Decimal]),
 		logger: logger,
 	}, nil
 }
