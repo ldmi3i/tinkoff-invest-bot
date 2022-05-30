@@ -20,8 +20,9 @@ type DbDataProc struct {
 	logger *zap.SugaredLogger
 	ctx    context.Context
 
-	savMap map[string]*collections.TList[decimal.Decimal]
-	lavMap map[string]*collections.TList[decimal.Decimal]
+	savMap     map[string]*collections.TList[decimal.Decimal]
+	prevSavMap map[string]decimal.Decimal
+	lavMap     map[string]*collections.TList[decimal.Decimal]
 }
 
 func (d *DbDataProc) GetDataStream() (<-chan procData, error) {
@@ -40,6 +41,7 @@ func (d *DbDataProc) GetDataStream() (<-chan procData, error) {
 	for _, figi := range d.figis {
 		sav := collections.NewTList[decimal.Decimal](time.Duration(shortDur) * time.Second)
 		lav := collections.NewTList[decimal.Decimal](time.Duration(longDur) * time.Second)
+		d.prevSavMap[figi] = decimal.Zero
 		d.savMap[figi] = &sav
 		d.lavMap[figi] = &lav
 	}
@@ -60,7 +62,6 @@ func (d *DbDataProc) procBg() {
 	}()
 	sOk := false
 	lOk := false
-	prevSav := decimal.Zero
 	for _, hDat := range d.hist {
 		select {
 		case <-d.ctx.Done():
@@ -73,6 +74,7 @@ func (d *DbDataProc) procBg() {
 				continue
 			}
 			lavL := d.lavMap[hDat.Figi]
+			prevSav := d.prevSavMap[hDat.Figi]
 			//d.logger.Debugf("Processing data %+v", hDat)
 			sPop := savL.Append(hDat.Close, hDat.Time)
 			lPop := lavL.Append(hDat.Close, hDat.Time)
@@ -97,7 +99,7 @@ func (d *DbDataProc) procBg() {
 					DER:   sav.Sub(prevSav).Mul(decimal.NewFromInt(int64(savL.GetSize()))),
 					Price: hDat.Close,
 				}
-				prevSav = sav
+				d.prevSavMap[hDat.Figi] = sav
 				d.logger.Debugf("Sending data: %+v", dat)
 				d.dtCh <- dat
 				time.Sleep(1 * time.Millisecond) //To provide time for mockTrader to finish operation
@@ -108,12 +110,13 @@ func (d *DbDataProc) procBg() {
 
 func newHistoryDataProc(req *domain.Algorithm, rep repository.HistoryRepository, logger *zap.SugaredLogger) (DataProc, error) {
 	return &DbDataProc{
-		params: domain.ParamsToMap(req.Params),
-		figis:  req.Figis,
-		rep:    rep,
-		dtCh:   make(chan procData),
-		savMap: make(map[string]*collections.TList[decimal.Decimal]),
-		lavMap: make(map[string]*collections.TList[decimal.Decimal]),
-		logger: logger,
+		params:     domain.ParamsToMap(req.Params),
+		figis:      req.Figis,
+		rep:        rep,
+		dtCh:       make(chan procData),
+		savMap:     make(map[string]*collections.TList[decimal.Decimal]),
+		prevSavMap: make(map[string]decimal.Decimal),
+		lavMap:     make(map[string]*collections.TList[decimal.Decimal]),
+		logger:     logger,
 	}, nil
 }

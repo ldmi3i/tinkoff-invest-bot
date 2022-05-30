@@ -32,10 +32,11 @@ type DataProcProd struct {
 	retryMin int                                //Minutes before consecutive retries when data stream broken
 	retryNum int                                //Number restore retries when data stream broken
 
-	longDur int //Extracted to state because of using in extract history method
-	savMap  map[string]*collections.TList[decimal.Decimal]
-	lavMap  map[string]*collections.TList[decimal.Decimal]
-	logger  *zap.SugaredLogger
+	longDur    int //Extracted to state because of using in extract history method
+	savMap     map[string]*collections.TList[decimal.Decimal]
+	prevSavMap map[string]decimal.Decimal
+	lavMap     map[string]*collections.TList[decimal.Decimal]
+	logger     *zap.SugaredLogger
 }
 
 func (d *DataProcProd) GetDataStream() (<-chan procData, error) {
@@ -51,6 +52,7 @@ func (d *DataProcProd) GetDataStream() (<-chan procData, error) {
 	for _, figi := range d.figis {
 		sav := collections.NewTList[decimal.Decimal](time.Duration(shortDur) * time.Second)
 		lav := collections.NewTList[decimal.Decimal](time.Duration(d.longDur) * time.Second)
+		d.prevSavMap[figi] = decimal.Zero
 		d.savMap[figi] = &sav
 		d.lavMap[figi] = &lav
 	}
@@ -83,7 +85,6 @@ func (d *DataProcProd) procBg() {
 		return
 	}
 	go d.processDataInBg()
-	prevSav := decimal.Zero
 OUT:
 	for {
 		select {
@@ -104,8 +105,9 @@ OUT:
 				d.logger.Infof("WARN received figi that not presented in listening list, id: %d", d.algoId)
 			}
 			lavL := d.lavMap[candle.Figi]
+			prevSav := d.prevSavMap[candle.Figi]
 			price := convert.QuotationToDec(candle.Close)
-			dTime := candle.Time.AsTime()
+			dTime := time.Now()
 			savL.Append(price, dTime)
 			lavL.Append(price, dTime)
 
@@ -127,7 +129,7 @@ OUT:
 				DER:   sav.Sub(prevSav).Mul(decimal.NewFromInt(int64(savL.GetSize()))),
 				Price: price,
 			}
-			prevSav = sav
+			d.prevSavMap[candle.Figi] = sav
 			d.logger.Debugf("Sending data for alg %d: %+v", d.algoId, dat)
 			d.dtCh <- dat
 		case <-d.ctx.Done():
@@ -282,17 +284,18 @@ func (d *DataProcProd) Stop() error {
 func newDataProc(req *domain.Algorithm, infoSrv service.InfoSrv, logger *zap.SugaredLogger) (DataProc, error) {
 	helper.GetDbUser()
 	return &DataProcProd{
-		algo:     req,
-		infoSrv:  infoSrv,
-		algoId:   req.ID,
-		params:   domain.ParamsToMap(req.Params),
-		figis:    req.Figis,
-		dtCh:     make(chan procData),
-		origDtCh: make(chan *investapi.MarketDataResponse),
-		savMap:   make(map[string]*collections.TList[decimal.Decimal]),
-		lavMap:   make(map[string]*collections.TList[decimal.Decimal]),
-		logger:   logger,
-		retryMin: helper.GetRetryMin(),
-		retryNum: helper.GetRetryNum(),
+		algo:       req,
+		infoSrv:    infoSrv,
+		algoId:     req.ID,
+		params:     domain.ParamsToMap(req.Params),
+		figis:      req.Figis,
+		dtCh:       make(chan procData),
+		origDtCh:   make(chan *investapi.MarketDataResponse),
+		savMap:     make(map[string]*collections.TList[decimal.Decimal]),
+		prevSavMap: make(map[string]decimal.Decimal),
+		lavMap:     make(map[string]*collections.TList[decimal.Decimal]),
+		logger:     logger,
+		retryMin:   helper.GetRetryMin(),
+		retryNum:   helper.GetRetryNum(),
 	}, nil
 }
