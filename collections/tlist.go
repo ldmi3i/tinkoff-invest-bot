@@ -1,14 +1,16 @@
 package collections
 
 import (
+	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 )
 
 // TList Struct is to keep buffer with required time interval of incoming data in memory
 // May be used to keep data for calculating moving average
-type TList[T any] struct {
+type TList[T fmt.Stringer] struct {
 	mu    sync.Mutex
 	d     time.Duration //time duration to keep
 	first *TListNode[T]
@@ -24,6 +26,10 @@ type TListNode[T any] struct {
 
 func (n TListNode[T]) GetData() T {
 	return n.data
+}
+
+func (n TListNode[T]) GetTime() time.Time {
+	return n.time
 }
 
 func (n TListNode[T]) Next() *TListNode[T] {
@@ -105,7 +111,17 @@ func (t TList[T]) IsEmpty() bool {
 	return t.first == nil
 }
 
-func NewTList[T any](d time.Duration) TList[T] {
+func (t TList[T]) String() string {
+	var sb strings.Builder
+	sb.WriteString("[")
+	for next := t.First(); next != nil; next = next.Next() {
+		sb.WriteString(fmt.Sprintf("Time: %s, data: %s;", next.time, next.data))
+	}
+	sb.WriteString("]")
+	return sb.String()
+}
+
+func NewTList[T fmt.Stringer](d time.Duration) TList[T] {
 	return TList[T]{
 		d: d,
 	}
