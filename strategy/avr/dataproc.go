@@ -32,17 +32,42 @@ const (
 	LongDur  string = "long_dur"  //Long window length in sec
 )
 
-func calcAvg(lst *collections.TList[decimal.Decimal]) (decimal.Decimal, error) {
+func calcAvr(lst *collections.TList[decimal.Decimal]) (avr decimal.Decimal, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("calcAvr method failed and recovered, info: %s", r)
+			err = errors.ConvertToError(r)
+		}
+	}()
 	if lst.IsEmpty() {
 		log.Println("Requested average of empty list...")
 		return decimal.Zero, errors.NewUnexpectedError("requested average calc on empty list")
 	}
-	cnt := 0
-	sum := decimal.Zero
-	for next := lst.First(); next != nil; next = next.Next() {
-		cnt += 1
-		sum = sum.Add(next.GetData())
+	var weightSum int64
+	var prevWeight int64
+	var currWeight int64
+	var sum decimal.Decimal
+	prevVal := lst.First()
+	next := prevVal.Next()
+	if next == nil { //One element case
+		return prevVal.GetData(), nil //Average equals to value
 	}
-	res := sum.Div(decimal.NewFromInt(int64(cnt)))
+	prevTime := prevVal.GetTime()
+	for ; next != nil; next = next.Next() {
+		currTime := next.GetTime()
+		currWeight = currTime.Sub(prevTime).Milliseconds() / 2 //Half of interval to previous value
+		fullWeight := prevWeight + currWeight                  //Full weight is half of intervals around measured data from both sizes
+		weightSum += fullWeight
+		//Add previous data weight with left + right half intervals (related interval)
+		sum = sum.Add(decimal.NewFromInt(fullWeight).Mul(prevVal.GetData())) //Sum of all weights
+		prevVal = next
+		prevWeight = currWeight
+		prevTime = currTime
+	}
+	//Take into account half of interval and the last value
+	sum = sum.Add(decimal.NewFromInt(prevWeight).Mul(prevVal.GetData()))
+	weightSum += prevWeight
+
+	res := sum.Div(decimal.NewFromInt(weightSum))
 	return res, nil
 }
