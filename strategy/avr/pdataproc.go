@@ -13,6 +13,7 @@ import (
 	"invest-robot/helper"
 	"invest-robot/service"
 	investapi "invest-robot/tapigen"
+	"invest-robot/trade/trmodel"
 	"io"
 	"strconv"
 	"time"
@@ -34,7 +35,7 @@ type DataProcProd struct {
 
 	longDur    int //Extracted to state because of using in extract history method
 	savMap     map[string]*collections.TList[decimal.Decimal]
-	prevSavMap map[string]decimal.Decimal
+	prevSavMap map[string]trmodel.Timed[decimal.Decimal]
 	lavMap     map[string]*collections.TList[decimal.Decimal]
 	logger     *zap.SugaredLogger
 }
@@ -52,7 +53,7 @@ func (d *DataProcProd) GetDataStream() (<-chan procData, error) {
 	for _, figi := range d.figis {
 		sav := collections.NewTList[decimal.Decimal](time.Duration(shortDur) * time.Second)
 		lav := collections.NewTList[decimal.Decimal](time.Duration(d.longDur) * time.Second)
-		d.prevSavMap[figi] = decimal.Zero
+		d.prevSavMap[figi] = trmodel.Timed[decimal.Decimal]{decimal.Zero, time.Now()}
 		d.savMap[figi] = &sav
 		d.lavMap[figi] = &lav
 	}
@@ -114,22 +115,35 @@ OUT:
 			sav, err := calcAvr(savL)
 			if err != nil {
 				d.logger.Errorf("Error while calculating short average %d: %s", d.algoId, err)
+				d.logger.Debugf("Wrong short average: %s", lavL)
 				break
 			}
 			lav, err := calcAvr(lavL)
 			if err != nil {
 				d.logger.Errorf("Error while calculating long average %d: %s", d.algoId, err)
+				d.logger.Debugf("Wrong long average: %s", lavL)
 				break
 			}
+			savDiff := sav.Sub(prevSav.Data)
+			timeDiff := dTime.Sub(prevSav.Time).Minutes()
+			var derivative decimal.Decimal
+			if timeDiff == 0 {
+				d.logger.Warnf("No time difference with previous value! Curr: %s, %s; Previous: %s, %s;",
+					prevSav.Time, prevSav.Data, dTime, sav)
+				derivative = decimal.Zero
+			} else {
+				savDiff.Div(decimal.NewFromFloat(timeDiff))
+			}
+
 			dat := procData{
 				Figi:  candle.Figi,
 				Time:  dTime,
 				LAV:   lav,
 				SAV:   sav,
-				DER:   sav.Sub(prevSav).Mul(decimal.NewFromInt(int64(savL.GetSize()))),
+				DER:   derivative,
 				Price: price,
 			}
-			d.prevSavMap[candle.Figi] = sav
+			d.prevSavMap[candle.Figi] = trmodel.Timed[decimal.Decimal]{sav, dTime}
 			d.logger.Debugf("Sending data for alg %d: %+v", d.algoId, dat)
 			d.dtCh <- dat
 		case <-d.ctx.Done():
@@ -292,7 +306,7 @@ func newDataProc(req *domain.Algorithm, infoSrv service.InfoSrv, logger *zap.Sug
 		dtCh:       make(chan procData),
 		origDtCh:   make(chan *investapi.MarketDataResponse),
 		savMap:     make(map[string]*collections.TList[decimal.Decimal]),
-		prevSavMap: make(map[string]decimal.Decimal),
+		prevSavMap: make(map[string]trmodel.Timed[decimal.Decimal]),
 		lavMap:     make(map[string]*collections.TList[decimal.Decimal]),
 		logger:     logger,
 		retryMin:   helper.GetRetryMin(),

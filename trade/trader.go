@@ -343,14 +343,14 @@ func (t *BaseTrader) procSell(opInfo *trmodel.OpInfo, action *domain.Action, sub
 
 //normalization required to take into account minimum price step of instrument
 func (t *BaseTrader) normalizePriceUp(price decimal.Decimal, priceStep decimal.Decimal) decimal.Decimal {
-	if price.Mod(priceStep) != decimal.Zero {
+	if !price.Mod(priceStep).Equal(decimal.Zero) {
 		return price.Div(priceStep).Ceil().Mul(priceStep)
 	}
 	return price
 }
 
 func (t *BaseTrader) normalizePriceDown(price decimal.Decimal, priceStep decimal.Decimal) decimal.Decimal {
-	if price.Mod(priceStep) != decimal.Zero {
+	if !price.Mod(priceStep).Equal(decimal.Zero) {
 		return price.Div(priceStep).Floor().Mul(priceStep)
 	}
 	return price

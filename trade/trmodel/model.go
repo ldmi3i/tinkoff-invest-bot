@@ -2,6 +2,7 @@ package trmodel
 
 import (
 	"github.com/shopspring/decimal"
+	"time"
 )
 
 type OpInfo struct {
@@ -10,4 +11,9 @@ type OpInfo struct {
 	Lim       decimal.Decimal
 	PriceStep decimal.Decimal
 	Currency  string
+}
+
+type Timed[T any] struct {
+	Data T
+	Time time.Time
 }
