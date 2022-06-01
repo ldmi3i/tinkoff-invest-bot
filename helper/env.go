@@ -21,7 +21,7 @@ var srvPort string
 
 var logFilePath string
 
-func initEnv() {
+func InitEnv() {
 	sanityCheck("TIN_TOKEN")
 	tinToken = os.Getenv("TIN_TOKEN")
 

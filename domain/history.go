@@ -16,7 +16,7 @@ type History struct {
 	Low   decimal.Decimal `gorm:"type:numeric"` //Lowest price
 	High  decimal.Decimal `gorm:"type:numeric"` //Highest price
 	Close decimal.Decimal `gorm:"type:numeric"` //Close price
-	Time  time.Time       //Timestamp of
+	Time  time.Time       //Timestamp of history record
 }
 
 func FromCandle(c *investapi.Candle) History {

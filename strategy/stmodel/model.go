@@ -15,7 +15,7 @@ import (
 //some parameters populated and persisted by Trader (see domain.Action documentation)
 type Algorithm interface {
 	//Configure is to configure Algorithm after restoring it state and data from db etc. (Currently not implemented)
-	Configure(ctx []domain.CtxParam) error
+	Configure(ctx []*domain.CtxParam) error
 	//Subscribe to algorithm and retrieve subscription to interact with algorithm
 	Subscribe() (*Subscription, error)
 	//IsActive return true if algorithm running and false if it was stopped

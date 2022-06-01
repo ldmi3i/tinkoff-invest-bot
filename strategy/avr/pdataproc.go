@@ -13,6 +13,7 @@ import (
 	"invest-robot/helper"
 	"invest-robot/service"
 	investapi "invest-robot/tapigen"
+	"invest-robot/trade/trmodel"
 	"io"
 	"strconv"
 	"time"
@@ -32,10 +33,11 @@ type DataProcProd struct {
 	retryMin int                                //Minutes before consecutive retries when data stream broken
 	retryNum int                                //Number restore retries when data stream broken
 
-	longDur int //Extracted to state because of using in extract history method
-	savMap  map[string]*collections.TList[decimal.Decimal]
-	lavMap  map[string]*collections.TList[decimal.Decimal]
-	logger  *zap.SugaredLogger
+	longDur    int //Extracted to state because of using in extract history method
+	savMap     map[string]*collections.TList[decimal.Decimal]
+	prevSavMap map[string]trmodel.Timed[decimal.Decimal]
+	lavMap     map[string]*collections.TList[decimal.Decimal]
+	logger     *zap.SugaredLogger
 }
 
 func (d *DataProcProd) GetDataStream() (<-chan procData, error) {
@@ -51,6 +53,7 @@ func (d *DataProcProd) GetDataStream() (<-chan procData, error) {
 	for _, figi := range d.figis {
 		sav := collections.NewTList[decimal.Decimal](time.Duration(shortDur) * time.Second)
 		lav := collections.NewTList[decimal.Decimal](time.Duration(d.longDur) * time.Second)
+		d.prevSavMap[figi] = trmodel.Timed[decimal.Decimal]{decimal.Zero, time.Now()}
 		d.savMap[figi] = &sav
 		d.lavMap[figi] = &lav
 	}
@@ -103,28 +106,44 @@ OUT:
 				d.logger.Infof("WARN received figi that not presented in listening list, id: %d", d.algoId)
 			}
 			lavL := d.lavMap[candle.Figi]
+			prevSav := d.prevSavMap[candle.Figi]
 			price := convert.QuotationToDec(candle.Close)
-			dTime := candle.Time.AsTime()
+			dTime := time.Now()
 			savL.Append(price, dTime)
 			lavL.Append(price, dTime)
 
-			sav, err := calcAvg(savL)
+			sav, err := calcAvr(savL)
 			if err != nil {
 				d.logger.Errorf("Error while calculating short average %d: %s", d.algoId, err)
+				d.logger.Debugf("Wrong short average: %s", lavL)
 				break
 			}
-			lav, err := calcAvg(lavL)
+			lav, err := calcAvr(lavL)
 			if err != nil {
 				d.logger.Errorf("Error while calculating long average %d: %s", d.algoId, err)
+				d.logger.Debugf("Wrong long average: %s", lavL)
 				break
 			}
+			savDiff := sav.Sub(prevSav.Data)
+			timeDiff := dTime.Sub(prevSav.Time).Minutes()
+			var derivative decimal.Decimal
+			if timeDiff == 0 {
+				d.logger.Warnf("No time difference with previous value! Curr: %s, %s; Previous: %s, %s;",
+					prevSav.Time, prevSav.Data, dTime, sav)
+				derivative = decimal.Zero
+			} else {
+				savDiff.Div(decimal.NewFromFloat(timeDiff))
+			}
+
 			dat := procData{
 				Figi:  candle.Figi,
 				Time:  dTime,
-				LAV:   *lav,
-				SAV:   *sav,
+				LAV:   lav,
+				SAV:   sav,
+				DER:   derivative,
 				Price: price,
 			}
+			d.prevSavMap[candle.Figi] = trmodel.Timed[decimal.Decimal]{sav, dTime}
 			d.logger.Debugf("Sending data for alg %d: %+v", d.algoId, dat)
 			d.dtCh <- dat
 		case <-d.ctx.Done():
@@ -279,17 +298,18 @@ func (d *DataProcProd) Stop() error {
 func newDataProc(req *domain.Algorithm, infoSrv service.InfoSrv, logger *zap.SugaredLogger) (DataProc, error) {
 	helper.GetDbUser()
 	return &DataProcProd{
-		algo:     req,
-		infoSrv:  infoSrv,
-		algoId:   req.ID,
-		params:   domain.ParamsToMap(req.Params),
-		figis:    req.Figis,
-		dtCh:     make(chan procData),
-		origDtCh: make(chan *investapi.MarketDataResponse),
-		savMap:   make(map[string]*collections.TList[decimal.Decimal]),
-		lavMap:   make(map[string]*collections.TList[decimal.Decimal]),
-		logger:   logger,
-		retryMin: helper.GetRetryMin(),
-		retryNum: helper.GetRetryNum(),
+		algo:       req,
+		infoSrv:    infoSrv,
+		algoId:     req.ID,
+		params:     domain.ParamsToMap(req.Params),
+		figis:      req.Figis,
+		dtCh:       make(chan procData),
+		origDtCh:   make(chan *investapi.MarketDataResponse),
+		savMap:     make(map[string]*collections.TList[decimal.Decimal]),
+		prevSavMap: make(map[string]trmodel.Timed[decimal.Decimal]),
+		lavMap:     make(map[string]*collections.TList[decimal.Decimal]),
+		logger:     logger,
+		retryMin:   helper.GetRetryMin(),
+		retryNum:   helper.GetRetryNum(),
 	}, nil
 }
