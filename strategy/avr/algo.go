@@ -28,24 +28,26 @@ import (
 //Important note! Currently, at start algorithm assumes that there is no available instruments to sell (it may be added in future as parameter or domain.Algorithm)
 //So at start algorithm search for buy conditions and only after that it cat make sell operations
 type AlgorithmImpl struct {
-	id            uint                       //Algorithm id extracted for more convenience
-	isActive      *abool.AtomicBool          //Atomic bool indicating is algorithm active
-	dataProc      DataProc                   //Data processor - provides data as the channel for algorithm
-	accountId     string                     //Account id extracted for more convenience
-	figis         []string                   //List of figis to monitor and use in algorithm
-	limits        []*domain.MoneyLimit       //Limits of money available for algorithm
-	algorithm     *domain.Algorithm          //Link to original object which algorithm based
-	param         map[string]string          //Map of different algorithm configuration parameters (order expiration time etc)
-	aChan         chan *stmodel.ActionReq    //Channel to send order requests to trader
-	arChan        chan *stmodel.ActionResp   //Channel to receive responses from trader about action result
-	stopCh        chan bool                  //Channel to stop algorithm when required
-	buyPrice      map[string]decimal.Decimal //Cache of buy prices made previously (when sell goes after buy - it clears record) - to prevent selling cheaper than previous buy
-	ordExp        time.Duration              //Expiration duration of posted orders - when expiration time passed and order not finished then it will be canceled
-	commission    decimal.Decimal            //Commission on deals to take into account
-	relDerivative decimal.Decimal
-	ctx           context.Context
-	cancelF       context.CancelFunc
-	instrAmount   map[string]int64 //Initial amount of instruments available
+	id              uint                       //Algorithm id extracted for more convenience
+	isActive        *abool.AtomicBool          //Atomic bool indicating is algorithm active
+	dataProc        DataProc                   //Data processor - provides data as the channel for algorithm
+	accountId       string                     //Account id extracted for more convenience
+	figis           []string                   //List of figis to monitor and use in algorithm
+	limits          []*domain.MoneyLimit       //Limits of money available for algorithm
+	algorithm       *domain.Algorithm          //Link to original object which algorithm based
+	param           map[string]string          //Map of different algorithm configuration parameters (order expiration time etc)
+	aChan           chan *stmodel.ActionReq    //Channel to send order requests to trader
+	arChan          chan *stmodel.ActionResp   //Channel to receive responses from trader about action result
+	stopCh          chan bool                  //Channel to stop algorithm when required
+	buyPrice        map[string]decimal.Decimal //Cache of buy prices made previously (when sell goes after buy - it clears record) - to prevent selling cheaper than previous buy
+	ordExp          time.Duration              //Expiration duration of posted orders - when expiration time passed and order not finished then it will be canceled
+	commission      decimal.Decimal            //Commission on deals to take into account
+	relDerivative   decimal.Decimal
+	stopLossEnabled bool
+	stopLossRel     decimal.Decimal //Relative price limit, when crossed - process market sell
+	ctx             context.Context
+	cancelF         context.CancelFunc
+	instrAmount     map[string]int64 //Initial amount of instruments available
 
 	logger *zap.SugaredLogger
 }
@@ -61,6 +63,7 @@ const (
 	OrderExpiration string = "order_expiration"
 	Commission      string = "order_commission"
 	RelDerivative   string = "relative_derivative"
+	StopLoss        string = "stop_loss"
 )
 
 type AlgoData struct {
@@ -208,6 +211,13 @@ func (a *AlgorithmImpl) processData(aDat *AlgoData, pDat *procData) {
 	} else if prevExists && pDat.DER.IsNegative() && (!ok || buyPrice.LessThan(pDat.Price)) &&
 		((prevDiff.IsPositive() && currDiff.IsNegative()) || (currDiff.IsNegative() && prevDiff.IsNegative())) {
 		if ok {
+			stopLossPrice := buyPrice.Mul(a.stopLossRel)
+			//If current price lower than stop loss - sell using market order
+			if a.stopLossEnabled && pDat.Price.LessThanOrEqual(stopLossPrice) {
+				a.logger.Infof("Stop loss reached; Current price: %s, stop loss price: %s", pDat.Price, stopLossPrice)
+				a.doSell(aDat, pDat, domain.Market)
+				return
+			}
 			buyPriceComm := buyPrice.Mul(decimal.NewFromInt(1).Add(a.commission.Mul(decimal.NewFromInt(2))))
 			a.logger.Infof("Buy price found. Current price: %s, buy price: %s, buy with percents: %s", pDat.Price, buyPrice, buyPriceComm)
 			if buyPriceComm.GreaterThanOrEqual(pDat.Price) {
@@ -216,7 +226,7 @@ func (a *AlgorithmImpl) processData(aDat *AlgoData, pDat *procData) {
 				return
 			}
 		}
-		a.doSell(aDat, pDat)
+		a.doSell(aDat, pDat, domain.Limited)
 	}
 }
 
@@ -237,7 +247,7 @@ func (a *AlgorithmImpl) doBuy(aDat *AlgoData, pDat *procData) {
 	aDat.statusMap[pDat.Figi] = waitRes
 }
 
-func (a *AlgorithmImpl) doSell(aDat *AlgoData, pDat *procData) {
+func (a *AlgorithmImpl) doSell(aDat *AlgoData, pDat *procData, orderType domain.OrderType) {
 	amount, iExists := aDat.instrAmount[pDat.Figi]
 	if iExists && amount != 0 {
 		action := domain.Action{
@@ -248,7 +258,7 @@ func (a *AlgorithmImpl) doSell(aDat *AlgoData, pDat *procData) {
 			ReqPrice:       pDat.Price,
 			ExpirationTime: time.Now().Add(a.ordExp),
 			Status:         domain.Created,
-			OrderType:      domain.Limited,
+			OrderType:      orderType,
 			RetrievedAt:    pDat.Time,
 			AccountID:      a.accountId,
 		}
@@ -365,22 +375,27 @@ func newAvr(algo *domain.Algorithm, logger *zap.SugaredLogger, proc DataProc) (s
 	paramMap := domain.ParamsToMap(algo.Params)
 	//Set order expiration time in seconds (when using limited requests), default 5 min
 	ordExpInt := getOrDefaultInt(paramMap, OrderExpiration, 300)
+	//Get stop loss parameter
+	stopLossPercent, stopLossEnabled := getDecimal(paramMap, StopLoss)
+	stopLossC := decimal.NewFromInt(1).Sub(stopLossPercent.Div(decimal.NewFromInt(100)))
 	algorthm := &AlgorithmImpl{
-		id:            algo.ID,
-		isActive:      abool.NewBool(true),
-		accountId:     algo.AccountId,
-		dataProc:      proc,
-		figis:         algo.Figis,
-		limits:        algo.MoneyLimits,
-		param:         paramMap,
-		algorithm:     algo,
-		buyPrice:      make(map[string]decimal.Decimal),
-		stopCh:        make(chan bool),
-		logger:        logger,
-		relDerivative: getOrDefaultDecimal(paramMap, RelDerivative, decimal.NewFromFloat(0.01)),
-		ordExp:        time.Duration(ordExpInt) * time.Second,
-		commission:    getOrDefaultDecimal(paramMap, Commission, decimal.NewFromFloat(0.04)).Div(decimal.NewFromInt(100)),
-		instrAmount:   make(map[string]int64),
+		id:              algo.ID,
+		isActive:        abool.NewBool(true),
+		accountId:       algo.AccountId,
+		dataProc:        proc,
+		figis:           algo.Figis,
+		limits:          algo.MoneyLimits,
+		param:           paramMap,
+		algorithm:       algo,
+		buyPrice:        make(map[string]decimal.Decimal),
+		stopCh:          make(chan bool),
+		logger:          logger,
+		relDerivative:   getOrDefaultDecimal(paramMap, RelDerivative, decimal.NewFromFloat(0.01)),
+		ordExp:          time.Duration(ordExpInt) * time.Second,
+		commission:      getOrDefaultDecimal(paramMap, Commission, decimal.NewFromFloat(0.04)).Div(decimal.NewFromInt(100)),
+		stopLossRel:     stopLossC,
+		stopLossEnabled: stopLossEnabled,
+		instrAmount:     make(map[string]int64),
 	}
 	if err := algorthm.Configure(algo.CtxParams); err != nil {
 		logger.Errorf("Failed configure algorithm %d with configuration %+v", algo.ID, algo.CtxParams)
@@ -414,4 +429,16 @@ func getOrDefaultInt(paramMap map[string]string, param string, def int) int {
 	} else {
 		return resDec
 	}
+}
+
+func getDecimal(paramMap map[string]string, param string) (decimal.Decimal, bool) {
+	res, ok := paramMap[param]
+	if !ok {
+		return decimal.Zero, false
+	}
+	resDec, err := decimal.NewFromString(res)
+	if err != nil {
+		return decimal.Zero, false
+	}
+	return resDec, true
 }
