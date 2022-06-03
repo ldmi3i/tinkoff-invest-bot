@@ -132,7 +132,7 @@ OUT:
 					prevSav.Time, prevSav.Data, dTime, sav)
 				derivative = decimal.Zero
 			} else {
-				savDiff.Div(decimal.NewFromFloat(timeDiff))
+				derivative = savDiff.Div(decimal.NewFromFloat(timeDiff))
 			}
 
 			dat := procData{
