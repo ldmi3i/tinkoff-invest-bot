@@ -197,36 +197,38 @@ func (a *AlgorithmImpl) processData(aDat *AlgoData, pDat *procData) {
 	}
 	buyPrice, ok := a.buyPrice[pDat.Figi]
 
-	//Buy if exists previous difference by figi, short window derivative is positive AND
-	//Go from negative to positive difference (short window crossing long) OR price growing now fast enough (by rel derivative setting)
-	if prevExists && pDat.DER.IsPositive() && ((prevDiff.IsNegative() && currDiff.IsPositive()) ||
-		(prevDiff.IsPositive() && currDiff.IsPositive() && relDer.GreaterThan(a.relDerivative))) {
+	//If previous difference value not exists finish method
+	if !prevExists {
+		return
+	}
+	switch true {
+	case pDat.DER.IsPositive() && ((prevDiff.IsNegative() && currDiff.IsPositive()) ||
+		(prevDiff.IsPositive() && currDiff.IsPositive() && relDer.GreaterThan(a.relDerivative))):
+		//Buy if exists previous difference by figi, short window derivative is positive AND
+		//Go from negative to positive difference (short window crossing long) OR price growing now fast enough (by rel derivative setting)
 		if ok {
 			a.logger.Info("Previous buy operation not finished with price: ", buyPrice, "; waiting for sell operation...")
-			return
+		} else {
+			a.doBuy(aDat, pDat)
 		}
-		a.doBuy(aDat, pDat)
-		//Sell if exists previous difference by figi, short window derivative negative, buy price not found or lower than current AND
-		//Go from positive to negative difference (short window crossing long) OR price dropping down
-	} else if prevExists && pDat.DER.IsNegative() && (!ok || buyPrice.LessThan(pDat.Price)) &&
-		((prevDiff.IsPositive() && currDiff.IsNegative()) || (currDiff.IsNegative() && prevDiff.IsNegative())) {
+	case pDat.DER.IsNegative() && (!ok || buyPrice.LessThan(pDat.Price)) &&
+		((prevDiff.IsPositive() && currDiff.IsNegative()) || (currDiff.IsNegative() && prevDiff.IsNegative())):
+		//Sell if exists previous difference by figi, short window derivative is negative, buy price not found or lower than current AND
+		//Go from positive to negative difference (short window crossing long) OR price dropping
 		if ok {
-			stopLossPrice := buyPrice.Mul(a.stopLossRel)
-			//If current price lower than stop loss - sell using market order
-			if a.stopLossEnabled && pDat.Price.LessThanOrEqual(stopLossPrice) {
-				a.logger.Infof("Stop loss reached; Current price: %s, stop loss price: %s", pDat.Price, stopLossPrice)
-				a.doSell(aDat, pDat, domain.Market)
-				return
-			}
 			buyPriceComm := buyPrice.Mul(decimal.NewFromInt(1).Add(a.commission.Mul(decimal.NewFromInt(2))))
 			a.logger.Infof("Buy price found. Current price: %s, buy price: %s, buy with percents: %s", pDat.Price, buyPrice, buyPriceComm)
 			if buyPriceComm.GreaterThanOrEqual(pDat.Price) {
 				a.logger.Infof("Buy price %s is greater than current %s plus 2x commissions - not good enough, waiting better...",
 					buyPriceComm, pDat.Price)
-				return
+				break
 			}
 		}
 		a.doSell(aDat, pDat, domain.Limited)
+	case ok && pDat.DER.IsNegative() && a.stopLossEnabled && pDat.SAV.LessThanOrEqual(buyPrice.Mul(a.stopLossRel)):
+		//If current price lower than stop loss - sell using market order
+		a.logger.Infof("Stop loss reached; Current price: %s, stop loss price: %s", pDat.Price, buyPrice.Mul(a.stopLossRel))
+		a.doSell(aDat, pDat, domain.Market)
 	}
 }
 
