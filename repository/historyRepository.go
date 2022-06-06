@@ -8,6 +8,7 @@ import (
 )
 
 //HistoryRepository provides methods to operate domain.History database data
+//go:generate mockgen -source=historyRepository.go -destination=../mocks/repository/mockHistoryRepository.go -package=repository
 type HistoryRepository interface {
 	ClearAndSaveAll(history []domain.History) error
 	FindAll() ([]domain.History, error)

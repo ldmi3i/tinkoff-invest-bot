@@ -6,6 +6,7 @@ import (
 	"invest-robot/repository"
 )
 
+//go:generate mockgen -source=statService.go -destination=../mocks/service/statService.go -package=service
 type StatService interface {
 	//GetAlgorithmStat returns statistics for the algorithm id
 	GetAlgorithmStat(req *dto.StatAlgoRequest) (*dto.StatAlgoResponse, error)
