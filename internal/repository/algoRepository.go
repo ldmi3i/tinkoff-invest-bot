@@ -18,10 +18,7 @@ type PgAlgoRepository struct {
 
 func (ar *PgAlgoRepository) SetActiveStatus(id uint, isActive bool) error {
 	sql := "update algorithms set is_active = ? where id = ?"
-	if err := ar.db.Exec(sql, isActive, id).Error; err != nil {
-		return err
-	}
-	return nil
+	return ar.db.Exec(sql, isActive, id).Error
 }
 
 func (ar *PgAlgoRepository) Save(algo *domain.Algorithm) (err error) {
@@ -31,8 +28,7 @@ func (ar *PgAlgoRepository) Save(algo *domain.Algorithm) (err error) {
 			err = errors.ConvertToError(rec)
 		}
 	}()
-	ar.db.Save(algo)
-	return nil
+	return ar.db.Save(algo).Error
 }
 
 func NewAlgoRepository(db *gorm.DB) AlgoRepository {

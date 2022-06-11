@@ -30,11 +30,15 @@ func (r *PgStatRepository) GetAlgorithmStat(req *dto.StatAlgoRequest) (*dto.Stat
 
 	failedCountSql := "select count(*) from actions where algorithm_id = ? and status = 'FAILED'"
 	var failedOp uint
-	r.db.Raw(failedCountSql, req.AlgorithmID).Scan(&failedOp)
+	if err = r.db.Raw(failedCountSql, req.AlgorithmID).Scan(&failedOp).Error; err != nil {
+		return nil, err
+	}
 
 	canceledCountSql := "select count(*) from actions where algorithm_id = ? and status = 'CANCELED'"
 	var canceledOp uint
-	r.db.Raw(canceledCountSql, req.AlgorithmID).Scan(&canceledOp)
+	if err = r.db.Raw(canceledCountSql, req.AlgorithmID).Scan(&canceledOp).Error; err != nil {
+		return nil, err
+	}
 
 	instrStat, err := r.getInstrStat(req.AlgorithmID)
 	if err != nil {

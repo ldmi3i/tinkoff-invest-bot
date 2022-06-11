@@ -24,8 +24,7 @@ func (rep *PgActionRepository) Save(action *domain.Action) (err error) {
 			err = errors.ConvertToError(r)
 		}
 	}()
-	rep.db.Save(action)
-	return nil
+	return rep.db.Save(action).Error
 }
 
 func (rep *PgActionRepository) UpdateStatusWithMsg(id uint, status domain.ActionStatus, msg string) (err error) {
@@ -35,8 +34,7 @@ func (rep *PgActionRepository) UpdateStatusWithMsg(id uint, status domain.Action
 			err = errors.ConvertToError(r)
 		}
 	}()
-	rep.db.Model(&domain.Action{}).Where("id = ?", id).Updates(domain.Action{Status: status, Info: msg})
-	return nil
+	return rep.db.Model(&domain.Action{}).Where("id = ?", id).Updates(domain.Action{Status: status, Info: msg}).Error
 }
 
 func NewActionRepository(db *gorm.DB) ActionRepository {

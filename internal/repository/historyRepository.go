@@ -20,15 +20,21 @@ type PgHistoryRepository struct {
 }
 
 func (h PgHistoryRepository) ClearAndSaveAll(history []domain.History) error {
-	h.db.Exec("DELETE FROM history")
-	h.db.Create(history)
+	if err := h.db.Exec("DELETE FROM history").Error; err != nil {
+		return err
+	}
+	if err := h.db.Create(history).Error; err != nil {
+		return err
+	}
 	h.findAllByFigisCache.Clear()
 	return nil
 }
 
 func (h PgHistoryRepository) FindAll() ([]domain.History, error) {
 	var hist []domain.History
-	h.db.Order("date").Find(&hist)
+	if err := h.db.Order("date").Find(&hist).Error; err != nil {
+		return nil, err
+	}
 	return hist, nil
 }
 
@@ -38,7 +44,9 @@ func (h PgHistoryRepository) FindAllByFigis(figis []string) ([]domain.History, e
 	if ok {
 		return hist, nil
 	}
-	h.db.Where("figi in ?", figis).Order("time").Find(&hist)
+	if err := h.db.Where("figi in ?", figis).Order("time").Find(&hist).Error; err != nil {
+		return nil, err
+	}
 	h.findAllByFigisCache.Put(strKey, hist)
 	return hist, nil
 }
