@@ -1,16 +1,17 @@
-package helper
+package grpc
 
 import (
 	"crypto/tls"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"invest-robot/internal/env"
 	"log"
 )
 
 var cl *grpc.ClientConn
 
 func InitGRPC() {
-	addr := GetGRPCAddress()
+	addr := env.GetGRPCAddress()
 	config := &tls.Config{
 		InsecureSkipVerify: true,
 	}

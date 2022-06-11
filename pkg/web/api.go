@@ -3,7 +3,7 @@ package web
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"invest-robot/internal/helper"
+	"invest-robot/internal/env"
 	"invest-robot/pkg/robot"
 	"log"
 )
@@ -15,7 +15,7 @@ func StartHttp() {
 	tradeHandlers(router, ctx)
 	statHandlers(router, ctx)
 
-	log.Fatal(router.Run(fmt.Sprintf(":%s", helper.GetSrvPort())))
+	log.Fatal(router.Run(fmt.Sprintf(":%s", env.GetSrvPort())))
 }
 
 func historyHandlers(router *gin.Engine, ctx *robot.Context) {

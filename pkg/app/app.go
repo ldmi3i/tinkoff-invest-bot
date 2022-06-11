@@ -1,7 +1,7 @@
 package app
 
 import (
-	"invest-robot/internal/helper"
+	"invest-robot/internal/connections/grpc"
 	"invest-robot/pkg/robot"
 	"invest-robot/pkg/web"
 	"log"
@@ -10,7 +10,7 @@ import (
 func Start() {
 	defer func() {
 		robot.PostProcess()
-		err := helper.Close()
+		err := grpc.Close()
 		if err != nil {
 			log.Printf("error while closing grpc connection: \n%s", err)
 		}

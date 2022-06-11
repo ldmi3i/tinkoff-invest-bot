@@ -3,7 +3,9 @@ package robot
 import (
 	"context"
 	"go.uber.org/zap"
-	"invest-robot/internal/helper"
+	"invest-robot/internal/connections/db"
+	"invest-robot/internal/connections/grpc"
+	"invest-robot/internal/env"
 	"invest-robot/internal/repository"
 	"invest-robot/internal/service"
 	"invest-robot/internal/strategy"
@@ -21,9 +23,9 @@ func GetContext() *Context {
 //Initializes application context and populate it with objects
 func initConfiguration() {
 	logConf := zap.NewDevelopmentConfig()
-	if helper.GetLogFilePath() != "" {
+	if env.GetLogFilePath() != "" {
 		logConf.OutputPaths = []string{
-			helper.GetLogFilePath(),
+			env.GetLogFilePath(),
 			"stderr",
 		}
 	}
@@ -39,10 +41,10 @@ func initConfiguration() {
 	tradeSdxSrv := service.NewTradeSandboxSrv(tapi, sugared)
 	tradeProdSrv := service.NewTradeProdService(tapi, sugared)
 
-	hRep := repository.NewHistoryRepository(helper.GetDB())
-	actionRep := repository.NewActionRepository(helper.GetDB())
-	aRep := repository.NewAlgoRepository(helper.GetDB())
-	statRep := repository.NewStatRepository(helper.GetDB())
+	hRep := repository.NewHistoryRepository(db.GetDB())
+	actionRep := repository.NewActionRepository(db.GetDB())
+	aRep := repository.NewAlgoRepository(db.GetDB())
+	statRep := repository.NewStatRepository(db.GetDB())
 
 	statSrv := service.NewStatService(statRep, sugared)
 	aFact := strategy.NewAlgFactory(infoSdxSrv, infoProdSrv, hRep, sugared)
@@ -123,9 +125,9 @@ func (ctx *Context) GetStatService() service.StatService {
 }
 
 func Init() {
-	helper.InitEnv()
-	helper.InitDB()
-	helper.InitGRPC()
+	env.InitEnv()
+	db.InitDB()
+	grpc.InitGRPC()
 	initConfiguration()
 }
 

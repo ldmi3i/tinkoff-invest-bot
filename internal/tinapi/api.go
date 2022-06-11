@@ -5,9 +5,10 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"invest-robot/internal/connections/grpc"
 	"invest-robot/internal/domain"
 	"invest-robot/internal/dto/dtotapi"
-	"invest-robot/internal/helper"
+	"invest-robot/internal/env"
 	investapi "invest-robot/internal/tapigen"
 	"log"
 	"time"
@@ -52,14 +53,14 @@ type DefaultTinApi struct {
 
 func NewTinApi(logger *zap.SugaredLogger) Api {
 	return &DefaultTinApi{
-		investapi.NewMarketDataServiceClient(helper.GetClient()),
-		investapi.NewMarketDataStreamServiceClient(helper.GetClient()),
-		investapi.NewInstrumentsServiceClient(helper.GetClient()),
-		investapi.NewSandboxServiceClient(helper.GetClient()),
-		investapi.NewOrdersServiceClient(helper.GetClient()),
-		investapi.NewOperationsServiceClient(helper.GetClient()),
-		investapi.NewOrdersStreamServiceClient(helper.GetClient()),
-		investapi.NewUsersServiceClient(helper.GetClient()),
+		investapi.NewMarketDataServiceClient(grpc.GetClient()),
+		investapi.NewMarketDataStreamServiceClient(grpc.GetClient()),
+		investapi.NewInstrumentsServiceClient(grpc.GetClient()),
+		investapi.NewSandboxServiceClient(grpc.GetClient()),
+		investapi.NewOrdersServiceClient(grpc.GetClient()),
+		investapi.NewOperationsServiceClient(grpc.GetClient()),
+		investapi.NewOrdersStreamServiceClient(grpc.GetClient()),
+		investapi.NewUsersServiceClient(grpc.GetClient()),
 		logger,
 	}
 }
@@ -90,7 +91,7 @@ func (t *DefaultTinApi) GetHistory(figis []string, ivl investapi.CandleInterval,
 
 func contextWithAuth(ctx context.Context) context.Context {
 	md := metadata.New(map[string]string{
-		"Authorization": "Bearer " + helper.GetTinToken(),
+		"Authorization": "Bearer " + env.GetTinToken(),
 		"x-app-name":    "ldmi3i",
 	})
 	return metadata.NewOutgoingContext(ctx, md)

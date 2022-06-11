@@ -9,8 +9,8 @@ import (
 	"invest-robot/internal/collections"
 	"invest-robot/internal/convert"
 	"invest-robot/internal/domain"
+	"invest-robot/internal/env"
 	"invest-robot/internal/errors"
-	"invest-robot/internal/helper"
 	"invest-robot/internal/service"
 	investapi "invest-robot/internal/tapigen"
 	"invest-robot/internal/trade/trmodel"
@@ -296,7 +296,7 @@ func (d *DataProcProd) Stop() error {
 }
 
 func newDataProc(req *domain.Algorithm, infoSrv service.InfoSrv, logger *zap.SugaredLogger) (DataProc, error) {
-	helper.GetDbUser()
+	env.GetDbUser()
 	return &DataProcProd{
 		algo:       req,
 		infoSrv:    infoSrv,
@@ -309,7 +309,7 @@ func newDataProc(req *domain.Algorithm, infoSrv service.InfoSrv, logger *zap.Sug
 		prevSavMap: make(map[string]trmodel.Timed[decimal.Decimal]),
 		lavMap:     make(map[string]*collections.TList[decimal.Decimal]),
 		logger:     logger,
-		retryMin:   helper.GetRetryMin(),
-		retryNum:   helper.GetRetryNum(),
+		retryMin:   env.GetRetryMin(),
+		retryNum:   env.GetRetryNum(),
 	}, nil
 }
