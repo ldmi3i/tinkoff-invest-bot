@@ -2,12 +2,12 @@ package trade
 
 import (
 	"context"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/collections"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/domain"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/repository"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/service"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/strategy/stmodel"
 	"go.uber.org/zap"
-	"invest-robot/internal/collections"
-	"invest-robot/internal/domain"
-	"invest-robot/internal/repository"
-	"invest-robot/internal/service"
-	"invest-robot/internal/strategy/stmodel"
 )
 
 type ProdTrader struct {

@@ -2,9 +2,9 @@ package grpc
 
 import (
 	"crypto/tls"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/env"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	"invest-robot/internal/env"
 	"log"
 )
 
@@ -28,5 +28,8 @@ func GetClient() grpc.ClientConnInterface {
 
 func Close() error {
 	log.Println("Gracefully closing grpc connection")
+	if cl == nil {
+		return nil
+	}
 	return cl.Close()
 }

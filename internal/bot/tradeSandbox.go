@@ -1,13 +1,13 @@
-package robot
+package bot
 
 import (
 	"context"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/dto"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/repository"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/service"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/strategy"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/trade"
 	"go.uber.org/zap"
-	"invest-robot/internal/dto"
-	"invest-robot/internal/repository"
-	"invest-robot/internal/service"
-	"invest-robot/internal/strategy"
-	"invest-robot/internal/trade"
 )
 
 type TradeSandboxAPI struct {

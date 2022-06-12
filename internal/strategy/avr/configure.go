@@ -2,9 +2,9 @@ package avr
 
 import (
 	"encoding/json"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/dto"
 	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
-	"invest-robot/internal/dto"
 )
 
 type algoState struct {

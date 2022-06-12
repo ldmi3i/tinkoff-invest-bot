@@ -3,9 +3,9 @@ package web
 import (
 	"context"
 	"github.com/gin-gonic/gin"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/bot"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/dto"
 	"go.uber.org/zap"
-	"invest-robot/internal/dto"
-	"invest-robot/pkg/robot"
 	"net/http"
 )
 
@@ -18,12 +18,12 @@ type TradeHandler interface {
 }
 
 type DefaultTradeHandler struct {
-	sandboxApi robot.TradeAPI
-	prodApi    robot.TradeAPI
+	sandboxApi bot.TradeAPI
+	prodApi    bot.TradeAPI
 	logger     *zap.SugaredLogger
 }
 
-func NewTradeHandler(sandboxApi robot.TradeAPI, prodApi robot.TradeAPI, logger *zap.SugaredLogger) TradeHandler {
+func NewTradeHandler(sandboxApi bot.TradeAPI, prodApi bot.TradeAPI, logger *zap.SugaredLogger) TradeHandler {
 	return &DefaultTradeHandler{sandboxApi, prodApi, logger}
 }
 
@@ -52,7 +52,7 @@ func (h *DefaultTradeHandler) TradeProd(c *gin.Context) {
 	h.trade(c, h.prodApi)
 }
 
-func (h *DefaultTradeHandler) trade(c *gin.Context, api robot.TradeAPI) {
+func (h *DefaultTradeHandler) trade(c *gin.Context, api bot.TradeAPI) {
 	var req dto.CreateAlgorithmRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		h.logger.Errorf("Error while validating CreateAlgorithm request:\n%s", err)

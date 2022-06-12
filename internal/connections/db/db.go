@@ -2,10 +2,10 @@ package db
 
 import (
 	"fmt"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/domain"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/env"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"invest-robot/internal/domain"
-	"invest-robot/internal/env"
 	"log"
 )
 

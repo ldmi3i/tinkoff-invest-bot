@@ -2,9 +2,9 @@ package service
 
 import (
 	"context"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/dto/dtotapi"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/tinapi"
 	"go.uber.org/zap"
-	"invest-robot/internal/dto/dtotapi"
-	"invest-robot/internal/tinapi"
 )
 
 type InfoProdService struct {

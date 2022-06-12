@@ -2,14 +2,14 @@ package tinapi
 
 import (
 	"context"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/connections/grpc"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/domain"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/dto/dtotapi"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/env"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/tapigen"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"invest-robot/internal/connections/grpc"
-	"invest-robot/internal/domain"
-	"invest-robot/internal/dto/dtotapi"
-	"invest-robot/internal/env"
-	investapi "invest-robot/internal/tapigen"
 	"log"
 	"time"
 )

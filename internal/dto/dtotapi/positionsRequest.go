@@ -1,6 +1,6 @@
 package dtotapi
 
-import investapi "invest-robot/internal/tapigen"
+import "github.com/ldmi3i/tinkoff-invest-bot/internal/tapigen"
 
 type PositionsRequest struct {
 	AccountId string

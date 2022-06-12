@@ -1,7 +1,7 @@
 package dtotapi
 
 import (
-	investapi "invest-robot/internal/tapigen"
+	investapi "github.com/ldmi3i/tinkoff-invest-bot/internal/tapigen"
 	"time"
 )
 

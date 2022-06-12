@@ -1,9 +1,9 @@
 package service
 
 import (
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/dto"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/repository"
 	"go.uber.org/zap"
-	"invest-robot/internal/dto"
-	"invest-robot/internal/repository"
 )
 
 type StatService interface {

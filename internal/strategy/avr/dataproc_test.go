@@ -1,9 +1,9 @@
 package avr
 
 import (
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/collections"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
-	"invest-robot/internal/collections"
 	"testing"
 	"time"
 )

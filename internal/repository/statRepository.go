@@ -1,8 +1,8 @@
 package repository
 
 import (
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/dto"
 	"gorm.io/gorm"
-	"invest-robot/internal/dto"
 )
 
 //StatRepository provides methods to retrieve statistics data from database

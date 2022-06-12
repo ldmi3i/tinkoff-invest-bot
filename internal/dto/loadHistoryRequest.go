@@ -1,6 +1,6 @@
 package dto
 
-import investapi "invest-robot/internal/tapigen"
+import "github.com/ldmi3i/tinkoff-invest-bot/internal/tapigen"
 
 type LoadHistoryRequest struct {
 	Figis     []string                 `json:"figis"`

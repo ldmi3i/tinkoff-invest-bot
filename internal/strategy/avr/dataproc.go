@@ -2,9 +2,9 @@ package avr
 
 import (
 	"context"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/collections"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/errors"
 	"github.com/shopspring/decimal"
-	"invest-robot/internal/collections"
-	"invest-robot/internal/errors"
 	"log"
 	"time"
 )

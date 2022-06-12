@@ -2,9 +2,9 @@ package web
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/bot"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/dto"
 	"go.uber.org/zap"
-	"invest-robot/internal/dto"
-	"invest-robot/pkg/robot"
 	"net/http"
 	"time"
 )
@@ -16,11 +16,11 @@ type HistoryHandler interface {
 }
 
 type DefaultHistoryHandler struct {
-	api    robot.HistoryAPI
+	api    bot.HistoryAPI
 	logger *zap.SugaredLogger
 }
 
-func NewHistoryHandler(h robot.HistoryAPI, logger *zap.SugaredLogger) HistoryHandler {
+func NewHistoryHandler(h bot.HistoryAPI, logger *zap.SugaredLogger) HistoryHandler {
 	return &DefaultHistoryHandler{h, logger}
 }
 

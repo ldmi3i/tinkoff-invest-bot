@@ -1,9 +1,9 @@
 package repository
 
 import (
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/domain"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/errors"
 	"gorm.io/gorm"
-	"invest-robot/internal/domain"
-	"invest-robot/internal/errors"
 	"log"
 )
 

@@ -1,17 +1,17 @@
-package robot
+package bot
 
 import (
 	"context"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/domain"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/dto"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/dto/dtotapi"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/repository"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/service"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/strategy"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/strategy/stmodel"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/tapigen"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/trade"
 	"go.uber.org/zap"
-	"invest-robot/internal/domain"
-	"invest-robot/internal/dto"
-	"invest-robot/internal/dto/dtotapi"
-	"invest-robot/internal/repository"
-	"invest-robot/internal/service"
-	"invest-robot/internal/strategy"
-	"invest-robot/internal/strategy/stmodel"
-	investapi "invest-robot/internal/tapigen"
-	"invest-robot/internal/trade"
 	"log"
 	"sync"
 	"time"

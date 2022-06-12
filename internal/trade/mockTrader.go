@@ -2,14 +2,14 @@ package trade
 
 import (
 	"context"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/domain"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/dto"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/errors"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/repository"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/strategy/stmodel"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/trade/trmodel"
 	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
-	"invest-robot/internal/domain"
-	"invest-robot/internal/dto"
-	"invest-robot/internal/errors"
-	"invest-robot/internal/repository"
-	"invest-robot/internal/strategy/stmodel"
-	"invest-robot/internal/trade/trmodel"
 	"time"
 )
 

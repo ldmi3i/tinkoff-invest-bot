@@ -2,8 +2,8 @@ package stmodel
 
 import (
 	"context"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/domain"
 	"github.com/shopspring/decimal"
-	"invest-robot/internal/domain"
 )
 
 //Algorithm is a general interface of any trading logic

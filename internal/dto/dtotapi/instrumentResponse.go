@@ -1,9 +1,9 @@
 package dtotapi
 
 import (
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/convert"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/tapigen"
 	"github.com/shopspring/decimal"
-	"invest-robot/internal/convert"
-	investapi "invest-robot/internal/tapigen"
 )
 
 type SecurityTradingStatus int

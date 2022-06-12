@@ -2,7 +2,7 @@ package service
 
 import (
 	"context"
-	"invest-robot/internal/dto/dtotapi"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/dto/dtotapi"
 )
 
 //TradeService provides methods for order management

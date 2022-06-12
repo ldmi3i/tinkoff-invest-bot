@@ -1,10 +1,10 @@
 package avr
 
 import (
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/errors"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/strategy/stmodel"
 	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
-	"invest-robot/internal/errors"
-	"invest-robot/internal/strategy/stmodel"
 	"regexp"
 )
 

@@ -1,9 +1,9 @@
-package robot
+package bot
 
 import (
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/dto"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/service"
 	"go.uber.org/zap"
-	"invest-robot/internal/dto"
-	"invest-robot/internal/service"
 )
 
 type StatAPI interface {

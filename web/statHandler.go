@@ -2,9 +2,9 @@ package web
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/bot"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/dto"
 	"go.uber.org/zap"
-	"invest-robot/internal/dto"
-	"invest-robot/pkg/robot"
 	"log"
 	"net/http"
 )
@@ -14,11 +14,11 @@ type StatHandler interface {
 }
 
 type DefaultStatHandler struct {
-	api    robot.StatAPI
+	api    bot.StatAPI
 	logger *zap.SugaredLogger
 }
 
-func NewStatHandler(statApi robot.StatAPI, logger *zap.SugaredLogger) StatHandler {
+func NewStatHandler(statApi bot.StatAPI, logger *zap.SugaredLogger) StatHandler {
 	return &DefaultStatHandler{statApi, logger}
 }
 

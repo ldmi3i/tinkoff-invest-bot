@@ -2,9 +2,9 @@ package repository
 
 import (
 	"fmt"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/collections"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/domain"
 	"gorm.io/gorm"
-	"invest-robot/internal/collections"
-	"invest-robot/internal/domain"
 )
 
 //HistoryRepository provides methods to operate domain.History database data

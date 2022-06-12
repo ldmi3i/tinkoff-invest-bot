@@ -1,8 +1,8 @@
 package convert
 
 import (
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/tapigen"
 	"github.com/shopspring/decimal"
-	investapi "invest-robot/internal/tapigen"
 )
 
 func QuotationToDec(q *investapi.Quotation) decimal.Decimal {

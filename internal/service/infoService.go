@@ -2,11 +2,11 @@ package service
 
 import (
 	"context"
-	"invest-robot/internal/domain"
-	"invest-robot/internal/dto/dtotapi"
-	"invest-robot/internal/errors"
-	investapi "invest-robot/internal/tapigen"
-	"invest-robot/internal/tinapi"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/domain"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/dto/dtotapi"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/errors"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/tapigen"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/tinapi"
 	"time"
 )
 

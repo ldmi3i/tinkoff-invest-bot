@@ -2,11 +2,11 @@ package avr
 
 import (
 	"context"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/collections"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/domain"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/repository"
 	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
-	"invest-robot/internal/collections"
-	"invest-robot/internal/domain"
-	"invest-robot/internal/repository"
 	"strconv"
 	"time"
 )

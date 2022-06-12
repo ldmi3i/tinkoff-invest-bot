@@ -3,10 +3,10 @@ package domain
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/dto"
 	"github.com/lib/pq"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
-	"invest-robot/internal/dto"
 )
 
 //Algorithm represents full algorithm configuration

@@ -2,14 +2,14 @@ package strategy
 
 import (
 	"fmt"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/collections"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/domain"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/errors"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/repository"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/service"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/strategy/avr"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/strategy/stmodel"
 	"go.uber.org/zap"
-	"invest-robot/internal/collections"
-	"invest-robot/internal/domain"
-	"invest-robot/internal/errors"
-	"invest-robot/internal/repository"
-	"invest-robot/internal/service"
-	"invest-robot/internal/strategy/avr"
-	"invest-robot/internal/strategy/stmodel"
 )
 
 //algProdFunc represents common production algorithm factory method
