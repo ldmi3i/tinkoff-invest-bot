@@ -3,7 +3,7 @@ package avr
 import (
 	"context"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/collections"
-	"github.com/ldmi3i/tinkoff-invest-bot/internal/domain"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/entity"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/repository"
 	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
@@ -15,7 +15,7 @@ type DbDataProc struct {
 	params map[string]string
 	figis  []string
 	rep    repository.HistoryRepository
-	hist   []domain.History
+	hist   []entity.History
 	dtCh   chan procData
 	logger *zap.SugaredLogger
 	ctx    context.Context
@@ -108,9 +108,9 @@ func (d *DbDataProc) procBg() {
 	}
 }
 
-func newHistoryDataProc(req *domain.Algorithm, rep repository.HistoryRepository, logger *zap.SugaredLogger) (DataProc, error) {
+func newHistoryDataProc(req *entity.Algorithm, rep repository.HistoryRepository, logger *zap.SugaredLogger) (DataProc, error) {
 	return &DbDataProc{
-		params:     domain.ParamsToMap(req.Params),
+		params:     entity.ParamsToMap(req.Params),
 		figis:      req.Figis,
 		rep:        rep,
 		dtCh:       make(chan procData),

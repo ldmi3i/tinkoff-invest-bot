@@ -1,14 +1,14 @@
 package repository
 
 import (
-	"github.com/ldmi3i/tinkoff-invest-bot/internal/domain"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/entity"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/errors"
 	"gorm.io/gorm"
 )
 
 //AlgoRepository provides methods to operate domain.Algorithm database data
 type AlgoRepository interface {
-	Save(algo *domain.Algorithm) error
+	Save(algo *entity.Algorithm) error
 	SetActiveStatus(id uint, isActive bool) error
 }
 
@@ -21,7 +21,7 @@ func (ar *PgAlgoRepository) SetActiveStatus(id uint, isActive bool) error {
 	return ar.db.Exec(sql, isActive, id).Error
 }
 
-func (ar *PgAlgoRepository) Save(algo *domain.Algorithm) (err error) {
+func (ar *PgAlgoRepository) Save(algo *entity.Algorithm) (err error) {
 	defer func() {
 		rec := recover()
 		if rec != nil {

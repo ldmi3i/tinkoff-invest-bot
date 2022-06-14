@@ -3,8 +3,8 @@ package tinapi
 import (
 	"context"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/connections/grpc"
-	"github.com/ldmi3i/tinkoff-invest-bot/internal/domain"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/dto/dtotapi"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/entity"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/env"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/tapigen"
 	"go.uber.org/zap"
@@ -16,7 +16,7 @@ import (
 
 //Api is a wrapper under generated GRPC to provide only required methods
 type Api interface {
-	GetHistory(figis []string, ivl investapi.CandleInterval, startDate time.Time, endDate time.Time, ctx context.Context) ([]domain.History, error)
+	GetHistory(figis []string, ivl investapi.CandleInterval, startDate time.Time, endDate time.Time, ctx context.Context) ([]entity.History, error)
 	MarketDataStream(ctx context.Context) (investapi.MarketDataStreamService_MarketDataStreamClient, error)
 	GetAllShares(ctx context.Context) (*dtotapi.SharesResponse, error)
 	GetInstrumentInfo(req *dtotapi.InstrumentRequest, ctx context.Context) (*dtotapi.InstrumentResponse, error)
@@ -65,8 +65,8 @@ func NewTinApi(logger *zap.SugaredLogger) Api {
 	}
 }
 
-func (t *DefaultTinApi) GetHistory(figis []string, ivl investapi.CandleInterval, startDate time.Time, endDate time.Time, ctx context.Context) ([]domain.History, error) {
-	var resps = make([]domain.History, 0, len(figis))
+func (t *DefaultTinApi) GetHistory(figis []string, ivl investapi.CandleInterval, startDate time.Time, endDate time.Time, ctx context.Context) ([]entity.History, error) {
+	var resps = make([]entity.History, 0, len(figis))
 	ctxA := contextWithAuth(ctx)
 	for _, figi := range figis {
 		req := investapi.GetCandlesRequest{
@@ -77,7 +77,7 @@ func (t *DefaultTinApi) GetHistory(figis []string, ivl investapi.CandleInterval,
 		}
 		data, err := t.marketDatCl.GetCandles(ctxA, &req)
 		for _, cndl := range data.GetCandles() {
-			histRec := domain.FromHistoricCandle(cndl)
+			histRec := entity.FromHistoricCandle(cndl)
 			histRec.Figi = figi
 			resps = append(resps, histRec)
 		}

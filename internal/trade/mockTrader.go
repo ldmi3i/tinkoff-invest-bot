@@ -2,8 +2,8 @@ package trade
 
 import (
 	"context"
-	"github.com/ldmi3i/tinkoff-invest-bot/internal/domain"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/dto"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/entity"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/errors"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/repository"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/strategy/stmodel"
@@ -80,7 +80,7 @@ OUT:
 			actCurrency, exst := t.figiCurrency[action.InstrFigi]
 			if !exst {
 				t.logger.Warnf("Requested unexpected figi: %s", action.InstrFigi)
-				t.sub.RChan <- t.getRespWithStatus(action, domain.Failed)
+				t.sub.RChan <- t.getRespWithStatus(action, entity.Failed)
 				continue
 			}
 			opInfo := trmodel.OpInfo{Currency: actCurrency}
@@ -91,16 +91,16 @@ OUT:
 			opInfo.PosPrice, err = t.calcPrice(action.InstrFigi, action.RetrievedAt)
 			if err != nil {
 				t.logger.Errorf("Error while calculating figi price: %s", err)
-				t.sub.RChan <- t.getRespWithStatus(action, domain.Failed)
+				t.sub.RChan <- t.getRespWithStatus(action, entity.Failed)
 				continue
 			}
 			if opInfo.Lim.IsZero() || opInfo.PosInLot == 0 || opInfo.PosPrice.IsZero() {
 				t.logger.Warnf("Limit or lot price is zero; figi: %s; limit: %s; pos in lot: %d;lot price: %s",
 					action.InstrFigi, opInfo.Lim, opInfo.PosInLot, opInfo.PosPrice)
-				t.sub.RChan <- t.getRespWithStatus(action, domain.Failed)
+				t.sub.RChan <- t.getRespWithStatus(action, entity.Failed)
 				continue
 			}
-			if action.Direction == domain.Buy {
+			if action.Direction == entity.Buy {
 				t.procBuy(opInfo, action, &trDat)
 			} else {
 				t.procSell(opInfo, action, &trDat)
@@ -116,12 +116,12 @@ OUT:
 	close(t.sub.RChan)
 }
 
-func (t *MockTrader) procBuy(opInfo trmodel.OpInfo, action *domain.Action, trDat *mockTraderData) {
+func (t *MockTrader) procBuy(opInfo trmodel.OpInfo, action *entity.Action, trDat *mockTraderData) {
 	lotPrice := decimal.NewFromInt(opInfo.PosInLot).Mul(opInfo.PosPrice)
 	if lotPrice.GreaterThan(opInfo.Lim) {
 		t.logger.Infof("Not enough money for figi %s; limit: %s; lot price: %s; one price: %s",
 			action.InstrFigi, opInfo.Lim, opInfo.PosPrice, lotPrice)
-		t.sub.RChan <- t.getRespWithStatus(action, domain.Failed)
+		t.sub.RChan <- t.getRespWithStatus(action, entity.Failed)
 		return
 	}
 	lotNum := opInfo.Lim.Div(lotPrice).Floor()
@@ -134,19 +134,19 @@ func (t *MockTrader) procBuy(opInfo trmodel.OpInfo, action *domain.Action, trDat
 	action.PositionPrice = opInfo.PosPrice
 	action.LotsExecuted = instrAmount
 	trDat.BuyOper += 1
-	t.sub.RChan <- t.getRespWithStatus(action, domain.Success)
+	t.sub.RChan <- t.getRespWithStatus(action, entity.Success)
 }
 
-func (t *MockTrader) procSell(opInfo trmodel.OpInfo, action *domain.Action, trDat *mockTraderData) {
+func (t *MockTrader) procSell(opInfo trmodel.OpInfo, action *entity.Action, trDat *mockTraderData) {
 	if action.LotAmount == 0 {
 		t.logger.Info("LotAmount is 0 - nothing to sell")
-		t.sub.RChan <- t.getRespWithStatus(action, domain.Failed)
+		t.sub.RChan <- t.getRespWithStatus(action, entity.Failed)
 		return
 	}
 	price, err := t.calcPrice(action.InstrFigi, action.RetrievedAt)
 	if err != nil {
 		t.logger.Error("Can't resolve price by figi, canceling operation...")
-		t.sub.RChan <- t.getRespWithStatus(action, domain.Failed)
+		t.sub.RChan <- t.getRespWithStatus(action, entity.Failed)
 		return
 	}
 	moneyAmount := price.Mul(decimal.NewFromInt(action.LotAmount * opInfo.PosInLot)) //Money amount is a price multiplied by num of positions
@@ -158,10 +158,10 @@ func (t *MockTrader) procSell(opInfo trmodel.OpInfo, action *domain.Action, trDa
 	}
 	action.TotalPrice = moneyAmount
 	trDat.SellOper += 1
-	t.sub.RChan <- t.getRespWithStatus(action, domain.Success)
+	t.sub.RChan <- t.getRespWithStatus(action, entity.Success)
 }
 
-func (t MockTrader) getRespWithStatus(action *domain.Action, status domain.ActionStatus) *stmodel.ActionResp {
+func (t MockTrader) getRespWithStatus(action *entity.Action, status entity.ActionStatus) *stmodel.ActionResp {
 	action.Status = status
 	return &stmodel.ActionResp{Action: action}
 }

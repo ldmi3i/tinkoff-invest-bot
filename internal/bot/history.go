@@ -2,9 +2,9 @@ package bot
 
 import (
 	"context"
-	"github.com/ldmi3i/tinkoff-invest-bot/internal/domain"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/dto"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/dto/dtotapi"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/entity"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/repository"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/service"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/strategy"
@@ -50,7 +50,7 @@ func (h *DefaultHistoryAPI) LoadHistory(figis []string, ivl investapi.CandleInte
 
 func (h *DefaultHistoryAPI) AnalyzeAlgo(req *dto.CreateAlgorithmRequest, ctx context.Context) (*dto.HistStatResponse, error) {
 	h.logger.Info("Analyze algorithm request: ", req)
-	algDm := domain.AlgorithmFromDto(req)
+	algDm := entity.AlgorithmFromDto(req)
 	alg, err := h.aFact.NewHist(algDm)
 	if err != nil {
 		return nil, err
@@ -101,7 +101,7 @@ func (h *DefaultHistoryAPI) performAnalysis(req *dto.CreateAlgorithmRequest, sha
 
 func (h *DefaultHistoryAPI) AnalyzeAlgoInRange(req *dto.CreateAlgorithmRequest, ctx context.Context) (*dto.HistStatInRangeResponse, error) {
 	h.logger.Info("Analyze algorithm in range from request: ", req)
-	algDm := domain.AlgorithmFromDto(req)
+	algDm := entity.AlgorithmFromDto(req)
 	algRange, err := h.aFact.NewRange(algDm)
 	if err != nil {
 		return nil, err

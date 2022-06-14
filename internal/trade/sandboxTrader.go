@@ -3,7 +3,7 @@ package trade
 import (
 	"context"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/collections"
-	"github.com/ldmi3i/tinkoff-invest-bot/internal/domain"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/entity"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/repository"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/service"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/strategy/stmodel"
@@ -27,7 +27,7 @@ func NewSandboxTrader(infoSrv service.InfoSrv, tradeSrv service.TradeService, ac
 			tradeSrv:  tradeSrv,
 			actionRep: actionRep,
 			subs:      collections.NewSyncMap[uint, *stmodel.Subscription](),
-			orders:    collections.NewSyncMap[string, *domain.Action](),
+			orders:    collections.NewSyncMap[string, *entity.Action](),
 			algoCh:    make(chan *stmodel.ActionReq, 1),
 			logger:    logger,
 		},

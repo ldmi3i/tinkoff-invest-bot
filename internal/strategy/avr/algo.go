@@ -3,8 +3,8 @@ package avr
 import (
 	"context"
 	"encoding/json"
-	"github.com/ldmi3i/tinkoff-invest-bot/internal/domain"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/dto"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/entity"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/errors"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/repository"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/service"
@@ -33,8 +33,8 @@ type AlgorithmImpl struct {
 	dataProc      DataProc                   //Data processor - provides data as the channel for algorithm
 	accountId     string                     //Account id extracted for more convenience
 	figis         []string                   //List of figis to monitor and use in algorithm
-	limits        []*domain.MoneyLimit       //Limits of money available for algorithm
-	algorithm     *domain.Algorithm          //Link to original object which algorithm based
+	limits        []*entity.MoneyLimit       //Limits of money available for algorithm
+	algorithm     *entity.Algorithm          //Link to original object which algorithm based
 	param         map[string]string          //Map of different algorithm configuration parameters (order expiration time etc)
 	aChan         chan *stmodel.ActionReq    //Channel to send order requests to trader
 	arChan        chan *stmodel.ActionResp   //Channel to receive responses from trader about action result
@@ -151,9 +151,9 @@ func (a *AlgorithmImpl) procBg(datCh <-chan procData) {
 func (a *AlgorithmImpl) processTraderResp(aDat *AlgoData, resp *stmodel.ActionResp) error {
 	action := resp.Action
 	a.logger.Debug("Processing trader response: ", *resp.Action)
-	if resp.Action.Status == domain.Success {
+	if resp.Action.Status == entity.Success {
 		iAmount := action.LotAmount
-		if action.Direction == domain.Sell {
+		if action.Direction == entity.Sell {
 			iAmount = -iAmount
 			//Drops buy price - because the deal has already been completed
 			delete(a.buyPrice, action.InstrFigi)
@@ -221,14 +221,14 @@ func (a *AlgorithmImpl) processData(aDat *AlgoData, pDat *procData) {
 }
 
 func (a *AlgorithmImpl) doBuy(aDat *AlgoData, pDat *procData) {
-	action := domain.Action{
+	action := entity.Action{
 		AlgorithmID:    a.id,
-		Direction:      domain.Buy,
+		Direction:      entity.Buy,
 		InstrFigi:      pDat.Figi,
 		ReqPrice:       pDat.Price,
 		ExpirationTime: time.Now().Add(a.ordExp),
-		Status:         domain.Created,
-		OrderType:      domain.Limited,
+		Status:         entity.Created,
+		OrderType:      entity.Limited,
 		RetrievedAt:    pDat.Time,
 		AccountID:      a.accountId,
 	}
@@ -240,15 +240,15 @@ func (a *AlgorithmImpl) doBuy(aDat *AlgoData, pDat *procData) {
 func (a *AlgorithmImpl) doSell(aDat *AlgoData, pDat *procData) {
 	amount, iExists := aDat.instrAmount[pDat.Figi]
 	if iExists && amount != 0 {
-		action := domain.Action{
+		action := entity.Action{
 			AlgorithmID:    a.id,
-			Direction:      domain.Sell,
+			Direction:      entity.Sell,
 			InstrFigi:      pDat.Figi,
 			LotAmount:      amount,
 			ReqPrice:       pDat.Price,
 			ExpirationTime: time.Now().Add(a.ordExp),
-			Status:         domain.Created,
-			OrderType:      domain.Limited,
+			Status:         entity.Created,
+			OrderType:      entity.Limited,
 			RetrievedAt:    pDat.Time,
 			AccountID:      a.accountId,
 		}
@@ -275,7 +275,7 @@ func (a *AlgorithmImpl) updateState() {
 	if err == nil {
 		param, ok := a.algorithm.GetCtxParam(dto.InstrAmountField)
 		if !ok {
-			param = &domain.CtxParam{
+			param = &entity.CtxParam{
 				ID:          0,
 				AlgorithmID: a.id,
 				Key:         dto.InstrAmountField,
@@ -288,7 +288,7 @@ func (a *AlgorithmImpl) updateState() {
 	}
 }
 
-func (a *AlgorithmImpl) makeReq(action *domain.Action) *stmodel.ActionReq {
+func (a *AlgorithmImpl) makeReq(action *entity.Action) *stmodel.ActionReq {
 	return &stmodel.ActionReq{
 		Action: action,
 		Limits: a.limits,
@@ -309,12 +309,12 @@ func (a *AlgorithmImpl) stopInternal() {
 	a.logger.Infof("Algorithm %d successfully stopped", a.algorithm.ID)
 }
 
-func (a *AlgorithmImpl) Configure(ctx []*domain.CtxParam) error {
+func (a *AlgorithmImpl) Configure(ctx []*entity.CtxParam) error {
 	if ctx == nil {
 		a.logger.Infof("Algorihtm %d configuration not set, skipping", a.id)
 		return nil
 	}
-	ctxParam := domain.ContextToMap(ctx)
+	ctxParam := entity.ContextToMap(ctx)
 
 	return configure(ctxParam, &algoState{
 		InitAmount: a.instrAmount,
@@ -326,12 +326,12 @@ func (a *AlgorithmImpl) GetParam() map[string]string {
 	return a.param
 }
 
-func (a *AlgorithmImpl) GetAlgorithm() *domain.Algorithm {
+func (a *AlgorithmImpl) GetAlgorithm() *entity.Algorithm {
 	return a.algorithm
 }
 
 //NewProd constructs new algorithm using production data processor
-func NewProd(algo *domain.Algorithm, infoSrv service.InfoSrv, logger *zap.SugaredLogger) (stmodel.Algorithm, error) {
+func NewProd(algo *entity.Algorithm, infoSrv service.InfoSrv, logger *zap.SugaredLogger) (stmodel.Algorithm, error) {
 	proc, err := newDataProc(algo, infoSrv, logger)
 	if err != nil {
 		return nil, err
@@ -340,7 +340,7 @@ func NewProd(algo *domain.Algorithm, infoSrv service.InfoSrv, logger *zap.Sugare
 }
 
 //NewSandbox constructs new algorithm using production data processor cause it the same for such algorithm
-func NewSandbox(algo *domain.Algorithm, infoSrv service.InfoSrv, logger *zap.SugaredLogger) (stmodel.Algorithm, error) {
+func NewSandbox(algo *entity.Algorithm, infoSrv service.InfoSrv, logger *zap.SugaredLogger) (stmodel.Algorithm, error) {
 	proc, err := newDataProc(algo, infoSrv, logger)
 	if err != nil {
 		return nil, err
@@ -349,7 +349,7 @@ func NewSandbox(algo *domain.Algorithm, infoSrv service.InfoSrv, logger *zap.Sug
 }
 
 //NewHist constructs new algorithm using history data processor
-func NewHist(algo *domain.Algorithm, hRep repository.HistoryRepository, rootLogger *zap.SugaredLogger) (stmodel.Algorithm, error) {
+func NewHist(algo *entity.Algorithm, hRep repository.HistoryRepository, rootLogger *zap.SugaredLogger) (stmodel.Algorithm, error) {
 	//New logger with Increased level to suppress history analysis not necessary logging
 	logger := zap.New(rootLogger.Desugar().Core(), zap.IncreaseLevel(zap.WarnLevel)).Sugar()
 	proc, err := newHistoryDataProc(algo, hRep, logger)
@@ -360,9 +360,9 @@ func NewHist(algo *domain.Algorithm, hRep repository.HistoryRepository, rootLogg
 }
 
 //Main average algorithm constructor
-func newAvr(algo *domain.Algorithm, logger *zap.SugaredLogger, proc DataProc) (stmodel.Algorithm, error) {
+func newAvr(algo *entity.Algorithm, logger *zap.SugaredLogger, proc DataProc) (stmodel.Algorithm, error) {
 	//Turn params to map for convenience
-	paramMap := domain.ParamsToMap(algo.Params)
+	paramMap := entity.ParamsToMap(algo.Params)
 	//Set order expiration time in seconds (when using limited requests), default 5 min
 	ordExpInt := getOrDefaultInt(paramMap, OrderExpiration, 300)
 	algorthm := &AlgorithmImpl{

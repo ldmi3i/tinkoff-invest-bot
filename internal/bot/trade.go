@@ -2,9 +2,9 @@ package bot
 
 import (
 	"context"
-	"github.com/ldmi3i/tinkoff-invest-bot/internal/domain"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/dto"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/dto/dtotapi"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/entity"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/errors"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/repository"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/service"
@@ -47,7 +47,7 @@ func (ta *BaseTradeAPI) StopAlgorithm(req *dto.StopAlgorithmRequest) (*dto.StopA
 }
 
 func (ta *BaseTradeAPI) tradeInternal(req *dto.CreateAlgorithmRequest,
-	factoryF func(request *domain.Algorithm) (stmodel.Algorithm, error), ctx context.Context) (*dto.TradeStartResponse, error) {
+	factoryF func(request *entity.Algorithm) (stmodel.Algorithm, error), ctx context.Context) (*dto.TradeStartResponse, error) {
 	ta.logger.Info("Requested new algorithm ", req)
 	//Check is enough rights to account at first
 	accounts, err := ta.infoSrv.GetAccounts(ctx)
@@ -66,7 +66,7 @@ func (ta *BaseTradeAPI) tradeInternal(req *dto.CreateAlgorithmRequest,
 	}
 
 	//Create and start algorithm
-	algDm := domain.AlgorithmFromDto(req)
+	algDm := entity.AlgorithmFromDto(req)
 	if err := ta.algRep.Save(algDm); err != nil {
 		return nil, err
 	}

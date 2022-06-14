@@ -1,4 +1,4 @@
-package domain
+package entity
 
 import (
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/convert"

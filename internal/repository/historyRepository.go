@@ -3,23 +3,23 @@ package repository
 import (
 	"fmt"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/collections"
-	"github.com/ldmi3i/tinkoff-invest-bot/internal/domain"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/entity"
 	"gorm.io/gorm"
 )
 
 //HistoryRepository provides methods to operate domain.History database data
 type HistoryRepository interface {
-	ClearAndSaveAll(history []domain.History) error
-	FindAll() ([]domain.History, error)
-	FindAllByFigis(figis []string) ([]domain.History, error)
+	ClearAndSaveAll(history []entity.History) error
+	FindAll() ([]entity.History, error)
+	FindAllByFigis(figis []string) ([]entity.History, error)
 }
 
 type PgHistoryRepository struct {
 	db                  *gorm.DB
-	findAllByFigisCache collections.SyncMap[string, []domain.History]
+	findAllByFigisCache collections.SyncMap[string, []entity.History]
 }
 
-func (h PgHistoryRepository) ClearAndSaveAll(history []domain.History) error {
+func (h PgHistoryRepository) ClearAndSaveAll(history []entity.History) error {
 	if err := h.db.Exec("DELETE FROM history").Error; err != nil {
 		return err
 	}
@@ -30,15 +30,15 @@ func (h PgHistoryRepository) ClearAndSaveAll(history []domain.History) error {
 	return nil
 }
 
-func (h PgHistoryRepository) FindAll() ([]domain.History, error) {
-	var hist []domain.History
+func (h PgHistoryRepository) FindAll() ([]entity.History, error) {
+	var hist []entity.History
 	if err := h.db.Order("date").Find(&hist).Error; err != nil {
 		return nil, err
 	}
 	return hist, nil
 }
 
-func (h PgHistoryRepository) FindAllByFigis(figis []string) ([]domain.History, error) {
+func (h PgHistoryRepository) FindAllByFigis(figis []string) ([]entity.History, error) {
 	strKey := fmt.Sprint(figis)
 	hist, ok := h.findAllByFigisCache.Get(strKey)
 	if ok {
@@ -52,5 +52,5 @@ func (h PgHistoryRepository) FindAllByFigis(figis []string) ([]domain.History, e
 }
 
 func NewHistoryRepository(db *gorm.DB) HistoryRepository {
-	return PgHistoryRepository{db, collections.NewSyncMap[string, []domain.History]()}
+	return PgHistoryRepository{db, collections.NewSyncMap[string, []entity.History]()}
 }

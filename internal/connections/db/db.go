@@ -2,7 +2,7 @@ package db
 
 import (
 	"fmt"
-	"github.com/ldmi3i/tinkoff-invest-bot/internal/domain"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/entity"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/env"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -30,12 +30,12 @@ func InitDB() {
 
 func migrate() error {
 	return db.AutoMigrate(
-		&domain.History{},
-		&domain.Algorithm{},
-		&domain.Action{},
-		&domain.Param{},
-		&domain.CtxParam{},
-		&domain.MoneyLimit{},
+		&entity.History{},
+		&entity.Algorithm{},
+		&entity.Action{},
+		&entity.Param{},
+		&entity.CtxParam{},
+		&entity.MoneyLimit{},
 	)
 }
 

@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/collections"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/convert"
-	"github.com/ldmi3i/tinkoff-invest-bot/internal/domain"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/entity"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/env"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/errors"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/service"
@@ -21,7 +21,7 @@ import (
 
 type DataProcProd struct {
 	stream   investapi.MarketDataStreamService_MarketDataStreamClient
-	algo     *domain.Algorithm
+	algo     *entity.Algorithm
 	infoSrv  service.InfoSrv
 	algoId   uint                               //Algorithm id
 	params   map[string]string                  //Algorithm parameters - sizes of AVR windows
@@ -295,13 +295,13 @@ func (d *DataProcProd) Stop() error {
 	return nil
 }
 
-func newDataProc(req *domain.Algorithm, infoSrv service.InfoSrv, logger *zap.SugaredLogger) (DataProc, error) {
+func newDataProc(req *entity.Algorithm, infoSrv service.InfoSrv, logger *zap.SugaredLogger) (DataProc, error) {
 	env.GetDbUser()
 	return &DataProcProd{
 		algo:       req,
 		infoSrv:    infoSrv,
 		algoId:     req.ID,
-		params:     domain.ParamsToMap(req.Params),
+		params:     entity.ParamsToMap(req.Params),
 		figis:      req.Figis,
 		dtCh:       make(chan procData),
 		origDtCh:   make(chan *investapi.MarketDataResponse),

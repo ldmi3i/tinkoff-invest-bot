@@ -2,8 +2,8 @@ package service
 
 import (
 	"context"
-	"github.com/ldmi3i/tinkoff-invest-bot/internal/domain"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/dto/dtotapi"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/entity"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/errors"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/tapigen"
 	"github.com/ldmi3i/tinkoff-invest-bot/internal/tinapi"
@@ -12,7 +12,7 @@ import (
 
 type InfoSrv interface {
 	//GetHistorySorted return sorted by time history in time interval
-	GetHistorySorted(finis []string, ivl investapi.CandleInterval, startTime time.Time, endTime time.Time, ctx context.Context) ([]domain.History, error)
+	GetHistorySorted(finis []string, ivl investapi.CandleInterval, startTime time.Time, endTime time.Time, ctx context.Context) ([]entity.History, error)
 
 	//GetDataStream returns bidirectional data stream client
 	GetDataStream(ctx context.Context) (investapi.MarketDataStreamService_MarketDataStreamClient, error)
@@ -43,12 +43,12 @@ func newBaseSrv(t tinapi.Api) *BaseInfoSrv {
 	return &BaseInfoSrv{tapi: t}
 }
 
-func (i *BaseInfoSrv) GetHistorySorted(figis []string, ivl investapi.CandleInterval, startTime time.Time, endTime time.Time, ctx context.Context) ([]domain.History, error) {
+func (i *BaseInfoSrv) GetHistorySorted(figis []string, ivl investapi.CandleInterval, startTime time.Time, endTime time.Time, ctx context.Context) ([]entity.History, error) {
 	next, err := nextTime(ivl, startTime)
 	if err != nil {
 		return nil, err
 	}
-	var hist []domain.History
+	var hist []entity.History
 	if next.After(endTime) {
 		hist, err = i.tapi.GetHistory(figis, ivl, startTime, endTime, ctx)
 		if err != nil {

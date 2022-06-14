@@ -2,7 +2,7 @@ package stmodel
 
 import (
 	"context"
-	"github.com/ldmi3i/tinkoff-invest-bot/internal/domain"
+	"github.com/ldmi3i/tinkoff-invest-bot/internal/entity"
 	"github.com/shopspring/decimal"
 )
 
@@ -15,7 +15,7 @@ import (
 //some parameters populated and persisted by Trader (see domain.Action documentation)
 type Algorithm interface {
 	//Configure is to configure Algorithm after restoring it state and data from db etc. (Currently not implemented)
-	Configure(ctx []*domain.CtxParam) error
+	Configure(ctx []*entity.CtxParam) error
 	//Subscribe to algorithm and retrieve subscription to interact with algorithm
 	Subscribe() (*Subscription, error)
 	//IsActive return true if algorithm running and false if it was stopped
@@ -23,7 +23,7 @@ type Algorithm interface {
 	//GetParam returns algorithm parameters as map
 	GetParam() map[string]string
 	//GetAlgorithm returns algorithm data which used as base
-	GetAlgorithm() *domain.Algorithm
+	GetAlgorithm() *entity.Algorithm
 	//Go starts algorithm running in background
 	Go(ctx context.Context) error
 	//Stop running algorithm
@@ -41,13 +41,13 @@ type ParamSplitter interface {
 
 //ActionResp represents common trader response model
 type ActionResp struct {
-	Action *domain.Action
+	Action *entity.Action
 }
 
 //ActionReq represents common algorithm request model
 type ActionReq struct {
-	Action *domain.Action
-	Limits []*domain.MoneyLimit
+	Action *entity.Action
+	Limits []*entity.MoneyLimit
 }
 
 //GetCurrLimit simplifies retrieving limit by required currency from limit slice
