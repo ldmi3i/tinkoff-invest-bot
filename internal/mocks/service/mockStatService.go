@@ -5,10 +5,10 @@
 package service
 
 import (
-	dto "invest-robot/dto"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
+	dto "github.com/ldmi3i/tinkoff-invest-bot/internal/dto"
 )
 
 // MockStatService is a mock of StatService interface.

@@ -5,10 +5,10 @@
 package repository
 
 import (
-	domain "invest-robot/domain"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
+	entity "github.com/ldmi3i/tinkoff-invest-bot/internal/entity"
 )
 
 // MockHistoryRepository is a mock of HistoryRepository interface.
@@ -35,7 +35,7 @@ func (m *MockHistoryRepository) EXPECT() *MockHistoryRepositoryMockRecorder {
 }
 
 // ClearAndSaveAll mocks base method.
-func (m *MockHistoryRepository) ClearAndSaveAll(history []domain.History) error {
+func (m *MockHistoryRepository) ClearAndSaveAll(history []entity.History) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ClearAndSaveAll", history)
 	ret0, _ := ret[0].(error)
@@ -49,10 +49,10 @@ func (mr *MockHistoryRepositoryMockRecorder) ClearAndSaveAll(history interface{}
 }
 
 // FindAll mocks base method.
-func (m *MockHistoryRepository) FindAll() ([]domain.History, error) {
+func (m *MockHistoryRepository) FindAll() ([]entity.History, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "FindAll")
-	ret0, _ := ret[0].([]domain.History)
+	ret0, _ := ret[0].([]entity.History)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -64,10 +64,10 @@ func (mr *MockHistoryRepositoryMockRecorder) FindAll() *gomock.Call {
 }
 
 // FindAllByFigis mocks base method.
-func (m *MockHistoryRepository) FindAllByFigis(figis []string) ([]domain.History, error) {
+func (m *MockHistoryRepository) FindAllByFigis(figis []string) ([]entity.History, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "FindAllByFigis", figis)
-	ret0, _ := ret[0].([]domain.History)
+	ret0, _ := ret[0].([]entity.History)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

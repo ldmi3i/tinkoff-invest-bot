@@ -6,13 +6,13 @@ package service
 
 import (
 	context "context"
-	domain "invest-robot/domain"
-	dtotapi "invest-robot/dto/dtotapi"
-	investapi "invest-robot/tapigen"
 	reflect "reflect"
 	time "time"
 
 	gomock "github.com/golang/mock/gomock"
+	dtotapi "github.com/ldmi3i/tinkoff-invest-bot/internal/dto/dtotapi"
+	entity "github.com/ldmi3i/tinkoff-invest-bot/internal/entity"
+	investapi "github.com/ldmi3i/tinkoff-invest-bot/internal/tapigen"
 )
 
 // MockInfoSrv is a mock of InfoSrv interface.
@@ -84,10 +84,10 @@ func (mr *MockInfoSrvMockRecorder) GetDataStream(ctx interface{}) *gomock.Call {
 }
 
 // GetHistorySorted mocks base method.
-func (m *MockInfoSrv) GetHistorySorted(finis []string, ivl investapi.CandleInterval, startTime, endTime time.Time, ctx context.Context) ([]domain.History, error) {
+func (m *MockInfoSrv) GetHistorySorted(finis []string, ivl investapi.CandleInterval, startTime, endTime time.Time, ctx context.Context) ([]entity.History, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetHistorySorted", finis, ivl, startTime, endTime, ctx)
-	ret0, _ := ret[0].([]domain.History)
+	ret0, _ := ret[0].([]entity.History)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

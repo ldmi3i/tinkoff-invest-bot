@@ -6,7 +6,7 @@ import (
 	"go.uber.org/zap"
 )
 
-//go:generate mockgen -source=statService.go -destination=../mocks/service/statService.go -package=service
+//go:generate mockgen -source=statService.go -destination=../mocks/service/mockStatService.go -package=service
 type StatService interface {
 	//GetAlgorithmStat returns statistics for the algorithm id
 	GetAlgorithmStat(req *dto.StatAlgoRequest) (*dto.StatAlgoResponse, error)
