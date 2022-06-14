@@ -1,4 +1,4 @@
-module invest-robot
+module github.com/ldmi3i/tinkoff-invest-bot
 
 go 1.18
 
