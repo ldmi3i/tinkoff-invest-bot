@@ -28,24 +28,26 @@ import (
 //Important note! Currently, at start algorithm assumes that there is no available instruments to sell (it may be added in future as parameter or domain.Algorithm)
 //So at start algorithm search for buy conditions and only after that it cat make sell operations
 type AlgorithmImpl struct {
-	id            uint                       //Algorithm id extracted for more convenience
-	isActive      *abool.AtomicBool          //Atomic bool indicating is algorithm active
-	dataProc      DataProc                   //Data processor - provides data as the channel for algorithm
-	accountId     string                     //Account id extracted for more convenience
-	figis         []string                   //List of figis to monitor and use in algorithm
-	limits        []*entity.MoneyLimit       //Limits of money available for algorithm
-	algorithm     *entity.Algorithm          //Link to original object which algorithm based
-	param         map[string]string          //Map of different algorithm configuration parameters (order expiration time etc)
-	aChan         chan *stmodel.ActionReq    //Channel to send order requests to trader
-	arChan        chan *stmodel.ActionResp   //Channel to receive responses from trader about action result
-	stopCh        chan bool                  //Channel to stop algorithm when required
-	buyPrice      map[string]decimal.Decimal //Cache of buy prices made previously (when sell goes after buy - it clears record) - to prevent selling cheaper than previous buy
-	ordExp        time.Duration              //Expiration duration of posted orders - when expiration time passed and order not finished then it will be canceled
-	commission    decimal.Decimal            //Commission on deals to take into account
-	relDerivative decimal.Decimal
-	ctx           context.Context
-	cancelF       context.CancelFunc
-	instrAmount   map[string]int64 //Initial amount of instruments available
+	id              uint                       //Algorithm id extracted for more convenience
+	isActive        *abool.AtomicBool          //Atomic bool indicating is algorithm active
+	dataProc        DataProc                   //Data processor - provides data as the channel for algorithm
+	accountId       string                     //Account id extracted for more convenience
+	figis           []string                   //List of figis to monitor and use in algorithm
+	limits          []*entity.MoneyLimit       //Limits of money available for algorithm
+	algorithm       *entity.Algorithm          //Link to original object which algorithm based
+	param           map[string]string          //Map of different algorithm configuration parameters (order expiration time etc)
+	aChan           chan *stmodel.ActionReq    //Channel to send order requests to trader
+	arChan          chan *stmodel.ActionResp   //Channel to receive responses from trader about action result
+	stopCh          chan bool                  //Channel to stop algorithm when required
+	buyPrice        map[string]decimal.Decimal //Cache of buy prices made previously (when sell goes after buy - it clears record) - to prevent selling cheaper than previous buy
+	ordExp          time.Duration              //Expiration duration of posted orders - when expiration time passed and order not finished then it will be canceled
+	commission      decimal.Decimal            //Commission on deals to take into account
+	relDerivative   decimal.Decimal
+	stopLossEnabled bool
+	stopLossRel     decimal.Decimal //Relative price limit, when crossed - process market sell
+	ctx             context.Context
+	cancelF         context.CancelFunc
+	instrAmount     map[string]int64 //Initial amount of instruments available
 
 	logger *zap.SugaredLogger
 }
@@ -61,6 +63,7 @@ const (
 	OrderExpiration string = "order_expiration"
 	Commission      string = "order_commission"
 	RelDerivative   string = "relative_derivative"
+	StopLoss        string = "stop_loss"
 )
 
 type AlgoData struct {
@@ -194,29 +197,38 @@ func (a *AlgorithmImpl) processData(aDat *AlgoData, pDat *procData) {
 	}
 	buyPrice, ok := a.buyPrice[pDat.Figi]
 
-	//Buy if exists previous difference by figi, short window derivative is positive AND
-	//Go from negative to positive difference (short window crossing long) OR price growing now fast enough (by rel derivative setting)
-	if prevExists && pDat.DER.IsPositive() && ((prevDiff.IsNegative() && currDiff.IsPositive()) ||
-		(prevDiff.IsPositive() && currDiff.IsPositive() && relDer.GreaterThan(a.relDerivative))) {
+	//If previous difference value not exists finish method
+	if !prevExists {
+		return
+	}
+	switch true {
+	case pDat.DER.IsPositive() && ((prevDiff.IsNegative() && currDiff.IsPositive()) ||
+		(prevDiff.IsPositive() && currDiff.IsPositive() && relDer.GreaterThan(a.relDerivative))):
+		//Buy if exists previous difference by figi, short window derivative is positive AND
+		//Go from negative to positive difference (short window crossing long) OR price growing now fast enough (by rel derivative setting)
 		if ok {
 			a.logger.Info("Previous buy operation not finished with price: ", buyPrice, "; waiting for sell operation...")
-			return
+		} else {
+			a.doBuy(aDat, pDat)
 		}
-		a.doBuy(aDat, pDat)
-		//Sell if exists previous difference by figi, short window derivative negative, buy price not found or lower than current AND
-		//Go from positive to negative difference (short window crossing long) OR price dropping down
-	} else if prevExists && pDat.DER.IsNegative() && (!ok || buyPrice.LessThan(pDat.Price)) &&
-		((prevDiff.IsPositive() && currDiff.IsNegative()) || (currDiff.IsNegative() && prevDiff.IsNegative())) {
+	case pDat.DER.IsNegative() && (!ok || buyPrice.LessThan(pDat.Price)) &&
+		((prevDiff.IsPositive() && currDiff.IsNegative()) || (currDiff.IsNegative() && prevDiff.IsNegative())):
+		//Sell if exists previous difference by figi, short window derivative is negative, buy price not found or lower than current AND
+		//Go from positive to negative difference (short window crossing long) OR price dropping
 		if ok {
 			buyPriceComm := buyPrice.Mul(decimal.NewFromInt(1).Add(a.commission.Mul(decimal.NewFromInt(2))))
 			a.logger.Infof("Buy price found. Current price: %s, buy price: %s, buy with percents: %s", pDat.Price, buyPrice, buyPriceComm)
 			if buyPriceComm.GreaterThanOrEqual(pDat.Price) {
 				a.logger.Infof("Buy price %s is greater than current %s plus 2x commissions - not good enough, waiting better...",
 					buyPriceComm, pDat.Price)
-				return
+				break
 			}
 		}
-		a.doSell(aDat, pDat)
+		a.doSell(aDat, pDat, entity.Limited)
+	case ok && pDat.DER.IsNegative() && a.stopLossEnabled && pDat.SAV.LessThanOrEqual(buyPrice.Mul(a.stopLossRel)):
+		//If current price lower than stop loss - sell using market order
+		a.logger.Infof("Stop loss reached; Current price: %s, stop loss price: %s", pDat.Price, buyPrice.Mul(a.stopLossRel))
+		a.doSell(aDat, pDat, entity.Market)
 	}
 }
 
@@ -237,7 +249,7 @@ func (a *AlgorithmImpl) doBuy(aDat *AlgoData, pDat *procData) {
 	aDat.statusMap[pDat.Figi] = waitRes
 }
 
-func (a *AlgorithmImpl) doSell(aDat *AlgoData, pDat *procData) {
+func (a *AlgorithmImpl) doSell(aDat *AlgoData, pDat *procData, orderType entity.OrderType) {
 	amount, iExists := aDat.instrAmount[pDat.Figi]
 	if iExists && amount != 0 {
 		action := entity.Action{
@@ -248,7 +260,7 @@ func (a *AlgorithmImpl) doSell(aDat *AlgoData, pDat *procData) {
 			ReqPrice:       pDat.Price,
 			ExpirationTime: time.Now().Add(a.ordExp),
 			Status:         entity.Created,
-			OrderType:      entity.Limited,
+			OrderType:      orderType,
 			RetrievedAt:    pDat.Time,
 			AccountID:      a.accountId,
 		}
@@ -365,22 +377,27 @@ func newAvr(algo *entity.Algorithm, logger *zap.SugaredLogger, proc DataProc) (s
 	paramMap := entity.ParamsToMap(algo.Params)
 	//Set order expiration time in seconds (when using limited requests), default 5 min
 	ordExpInt := getOrDefaultInt(paramMap, OrderExpiration, 300)
+	//Get stop loss parameter
+	stopLossPercent, stopLossEnabled := getDecimal(paramMap, StopLoss)
+	stopLossC := decimal.NewFromInt(1).Sub(stopLossPercent.Div(decimal.NewFromInt(100)))
 	algorthm := &AlgorithmImpl{
-		id:            algo.ID,
-		isActive:      abool.NewBool(true),
-		accountId:     algo.AccountId,
-		dataProc:      proc,
-		figis:         algo.Figis,
-		limits:        algo.MoneyLimits,
-		param:         paramMap,
-		algorithm:     algo,
-		buyPrice:      make(map[string]decimal.Decimal),
-		stopCh:        make(chan bool),
-		logger:        logger,
-		relDerivative: getOrDefaultDecimal(paramMap, RelDerivative, decimal.NewFromFloat(0.01)),
-		ordExp:        time.Duration(ordExpInt) * time.Second,
-		commission:    getOrDefaultDecimal(paramMap, Commission, decimal.NewFromFloat(0.04)).Div(decimal.NewFromInt(100)),
-		instrAmount:   make(map[string]int64),
+		id:              algo.ID,
+		isActive:        abool.NewBool(true),
+		accountId:       algo.AccountId,
+		dataProc:        proc,
+		figis:           algo.Figis,
+		limits:          algo.MoneyLimits,
+		param:           paramMap,
+		algorithm:       algo,
+		buyPrice:        make(map[string]decimal.Decimal),
+		stopCh:          make(chan bool),
+		logger:          logger,
+		relDerivative:   getOrDefaultDecimal(paramMap, RelDerivative, decimal.NewFromFloat(0.01)),
+		ordExp:          time.Duration(ordExpInt) * time.Second,
+		commission:      getOrDefaultDecimal(paramMap, Commission, decimal.NewFromFloat(0.04)).Div(decimal.NewFromInt(100)),
+		stopLossRel:     stopLossC,
+		stopLossEnabled: stopLossEnabled,
+		instrAmount:     make(map[string]int64),
 	}
 	if err := algorthm.Configure(algo.CtxParams); err != nil {
 		logger.Errorf("Failed configure algorithm %d with configuration %+v", algo.ID, algo.CtxParams)
@@ -414,4 +431,16 @@ func getOrDefaultInt(paramMap map[string]string, param string, def int) int {
 	} else {
 		return resDec
 	}
+}
+
+func getDecimal(paramMap map[string]string, param string) (decimal.Decimal, bool) {
+	res, ok := paramMap[param]
+	if !ok {
+		return decimal.Zero, false
+	}
+	resDec, err := decimal.NewFromString(res)
+	if err != nil {
+		return decimal.Zero, false
+	}
+	return resDec, true
 }

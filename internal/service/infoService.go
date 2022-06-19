@@ -10,6 +10,7 @@ import (
 	"time"
 )
 
+//go:generate mockgen -source=./infoService.go -destination=../mocks/service/mockInfoService.go -package=service
 type InfoSrv interface {
 	//GetHistorySorted return sorted by time history in time interval
 	GetHistorySorted(finis []string, ivl investapi.CandleInterval, startTime time.Time, endTime time.Time, ctx context.Context) ([]entity.History, error)
