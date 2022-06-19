@@ -20,15 +20,14 @@ services:
     container_name: invest-bot
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: cmd/invest-bot/Dockerfile
+    env_file:
+      - cmd/invest-bot/.env
     environment:
       DB_USER: "user"
       DB_HOST: "postgres-db"
       DB_PORT: "5432"
       DB_PASSWORD: "54643243325"
-      GIN_MODE: "release"
-      RETRY_NUM: 3
-      RETRY_INTERVAL_MIN: 3
 #      GRPC_GO_LOG_SEVERITY_LEVEL: "info" #For GRPC debug
 #      GRPC_GO_LOG_VERBOSITY_LEVEL: "99"
       TIN_TOKEN: "YOUR TOKEN"
